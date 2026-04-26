@@ -26,6 +26,9 @@
 # 同步依赖到 .venv（会读 pyproject.toml + uv.lock）
 uv sync
 
+# 第一次跑前：拷一份 agent 配置（agents.toml 已 gitignored；改成你自己的 profile）
+cp agents.toml.example agents.toml
+
 # 跑 CLI（uv run 自动用项目 venv，无需 activate）
 uv run brainstorm --help
 ```

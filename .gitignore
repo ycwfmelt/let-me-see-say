@@ -28,3 +28,5 @@ Thumbs.db
 private-workspaces/
 .brainstormd-state/
 *.local.toml
+# User-specific agent config (copy agents.toml.example to agents.toml + edit)
+agents.toml

@@ -60,6 +60,12 @@ def new(
     """
     if not agents.exists():
         typer.echo(f"agents.toml not found at {agents}", err=True)
+        example = agents.parent / f"{agents.name}.example"
+        if example.exists():
+            typer.echo(
+                f"Hint: copy {example} → {agents} and edit before running.",
+                err=True,
+            )
         raise typer.Exit(1)
     profiles = load_agent_profiles(agents)
     names = [n.strip() for n in participants.split(",") if n.strip()]
