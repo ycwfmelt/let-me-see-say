@@ -12,7 +12,6 @@ from __future__ import annotations
 import json
 import random
 import re
-import textwrap
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -445,6 +444,20 @@ def _draft_outcome(session: Session) -> None:
     )
 
 
+def _commit_pending_main_changes(session: Session, message: str) -> None:
+    """If main's working tree has uncommitted changes (typically human edits
+    to outcome.md), stage and commit them with `message`.
+
+    Required before octopus-merging participant branches in `finalize` (git
+    refuses with 'not uptodate' if the merge would touch dirty paths) and
+    before `advance_to_next_turn` delivers outcome to participants (otherwise
+    we'd deliver an outcome version that's only on disk, not in the repo's
+    history).
+    """
+    if git_ops.has_dirty_state(session.repo_path):
+        git_ops.commit(session.repo_path, message)
+
+
 def _deliver_outcome_to_participants(session: Session) -> None:
     """Copy the (human-confirmed) outcome from vault main to each participant's
     worktree and commit on their branch.
@@ -575,6 +588,11 @@ def advance_to_next_turn(session: Session) -> Session:
             f"expected {PHASE_OUTCOME_PENDING!r}"
         )
 
+    # Capture any human edits to main's outcome.md before delivery
+    _commit_pending_main_changes(
+        session, f"outcome confirmed: turn-{session.current_turn}"
+    )
+
     # Deliver previous turn's confirmed outcome to each participant
     _deliver_outcome_to_participants(session)
 
@@ -606,6 +624,12 @@ def finalize(session: Session) -> Session:
     Per ADR-003, this is the only legitimate cross-participant merge in a
     session — used to produce the archive view in vault main.
     """
+    # Capture any uncommitted human edits before the octopus merge — git
+    # refuses to merge if the working tree is dirty on touched paths.
+    _commit_pending_main_changes(
+        session, "outcome edits captured before finalize"
+    )
+
     branches = [p.branch for p in session.participants]
     git_ops.merge_branches(
         session.repo_path,

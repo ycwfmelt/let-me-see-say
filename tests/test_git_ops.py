@@ -316,6 +316,21 @@ def test_merge_branches_octopus_brings_all_in(tmp_path: Path):
 # ---------------------------------------------------------------------------
 
 
+def test_has_dirty_state(tmp_path: Path):
+    repo = make_repo(tmp_path / "repo")
+    write_and_commit(repo, "a.txt", "1", "init")
+    assert not git_ops.has_dirty_state(repo)
+    # Modify tracked file
+    (repo / "a.txt").write_text("2")
+    assert git_ops.has_dirty_state(repo)
+    # Commit
+    git_ops.commit(repo, "update")
+    assert not git_ops.has_dirty_state(repo)
+    # Add untracked file
+    (repo / "b.txt").write_text("new")
+    assert git_ops.has_dirty_state(repo)
+
+
 def test_branch_exists(tmp_path: Path):
     repo = make_repo(tmp_path / "repo")
     write_and_commit(repo, "a.txt", "1", "init")

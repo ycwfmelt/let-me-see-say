@@ -249,6 +249,14 @@ def merge_branches(
     _run(args, cwd=repo_path)
 
 
+def has_dirty_state(repo_path: Path | str) -> bool:
+    """True if the working tree has any uncommitted changes (modified, staged,
+    or untracked tracked-mismatch). Used by orchestrator to detect human
+    edits to outcome.md before merging or delivering to next turn."""
+    proc = _run(["status", "--porcelain"], cwd=repo_path, check=False)
+    return bool(proc.stdout.strip())
+
+
 def current_branch(repo_path: Path | str) -> str:
     """Return the current branch name (or 'HEAD' if detached).
 

@@ -406,3 +406,139 @@ def test_advance_to_next_turn_rejects_wrong_phase(tmp_path: Path):
     session.current_phase = orchestrator.PHASE_ROUND_1_DONE
     with pytest.raises(RuntimeError, match="phase"):
         orchestrator.advance_to_next_turn(session)
+
+
+# ---------------------------------------------------------------------------
+# Auto-commit pending main changes before finalize / advance
+# ---------------------------------------------------------------------------
+
+
+def _make_finalize_ready_session(tmp_path: Path) -> tuple:
+    """Build a session whose two participant branches have content, ready to
+    octopus-merge. Returns (session, repo_path)."""
+    from brainstormd.participant import AgentProfile, TUIAgent
+
+    repo = tmp_path / "vault"
+    git_ops.init_repo(repo)
+    git_ops.configure_user(repo, "t", "t@e.com")
+    (repo / "shared.md").write_text("v1")
+    git_ops.commit(repo, "init")
+
+    wt_a = tmp_path / "wt-a"
+    git_ops.add_worktree(repo, wt_a, branch="participant/s/alice")
+    (wt_a / "alice-stuff.md").write_text("from alice")
+    git_ops.commit(wt_a, "alice work")
+
+    wt_b = tmp_path / "wt-b"
+    git_ops.add_worktree(repo, wt_b, branch="participant/s/bob")
+    (wt_b / "bob-stuff.md").write_text("from bob")
+    git_ops.commit(wt_b, "bob work")
+
+    profile = AgentProfile(name="x", cli="bash")
+    a = TUIAgent(name="alice", session_id="s", worktree_path=wt_a, profile=profile)
+    b = TUIAgent(name="bob", session_id="s", worktree_path=wt_b, profile=profile)
+
+    workspaces = tmp_path / "wk"
+    workspaces.mkdir()
+    session = Session(
+        session_id="s",
+        topic="t",
+        vault_path=tmp_path,
+        repo_path=repo,
+        private_workspaces=workspaces,
+        participants=[a, b],
+        current_turn=1,
+    )
+    return session, repo
+
+
+def test_finalize_commits_dirty_main_before_merge(tmp_path: Path):
+    """User's reported bug: human edits outcome.md, finalize fails with
+    'outcome.md not uptodate'. Fixed by auto-committing before merge."""
+    session, repo = _make_finalize_ready_session(tmp_path)
+    # Simulate human-edited outcome.md left uncommitted
+    (repo / "shared.md").write_text("v1-edited-by-human")
+    assert git_ops.has_dirty_state(repo)
+
+    # Should NOT raise
+    orchestrator.finalize(session)
+
+    # Dirty state was committed; merge happened; both participants' content present
+    assert not git_ops.has_dirty_state(repo)
+    assert (repo / "shared.md").read_text() == "v1-edited-by-human"
+    assert (repo / "alice-stuff.md").read_text() == "from alice"
+    assert (repo / "bob-stuff.md").read_text() == "from bob"
+    # The auto-commit message is in history
+    subjects = git_ops.log_subjects(repo, "main")
+    assert any("outcome edits captured before finalize" in s for s in subjects)
+
+
+def test_finalize_clean_state_no_outcome_capture_commit(tmp_path: Path):
+    """If main is clean before finalize, no 'outcome edits captured' commit
+    is created (the only post-finalize subject is the merge itself; the
+    octopus merge also brings participant commits into reachable history,
+    so we don't count by total subjects)."""
+    session, repo = _make_finalize_ready_session(tmp_path)
+    assert not git_ops.has_dirty_state(repo)
+    orchestrator.finalize(session)
+
+    subjects = git_ops.log_subjects(repo, "main")
+    assert not any("outcome edits captured before finalize" in s for s in subjects)
+
+
+def test_advance_to_next_turn_commits_dirty_outcome_first(tmp_path: Path):
+    """advance_to_next_turn should auto-commit dirty outcome.md before delivery."""
+    from brainstormd.participant import AgentProfile, TUIAgent
+
+    repo = tmp_path / "vault"
+    git_ops.init_repo(repo)
+    git_ops.configure_user(repo, "t", "t@e.com")
+    (repo / "00_topic.md").write_text("topic")
+    git_ops.commit(repo, "init")
+
+    wt = tmp_path / "wt"
+    git_ops.add_worktree(repo, wt, branch="participant/s/alice")
+
+    # Pretend turn-1 ran and outcome was drafted then user edited
+    outcome_dir = repo / "turn-1"
+    outcome_dir.mkdir()
+    (outcome_dir / "outcome.md").write_text("draft")
+    git_ops.commit(repo, "draft outcome: turn-1")
+    # Human edits, but doesn't commit
+    (outcome_dir / "outcome.md").write_text("USER-CONFIRMED-V2")
+    assert git_ops.has_dirty_state(repo)
+
+    profile = AgentProfile(name="alice", cli="bash")
+    a = TUIAgent(name="alice", session_id="s", worktree_path=wt, profile=profile)
+    workspaces = tmp_path / "wk"
+    workspaces.mkdir()
+    session = Session(
+        session_id="s",
+        topic="t",
+        vault_path=tmp_path,
+        repo_path=repo,
+        private_workspaces=workspaces,
+        participants=[a],
+        current_turn=1,
+        current_phase=orchestrator.PHASE_OUTCOME_PENDING,
+    )
+    session.save_manifest()
+
+    # advance_to_next_turn would normally proceed to round-1 which spawns TUI;
+    # we just want to verify the commit-before-deliver step. Catch and inspect
+    # at a known checkpoint by stubbing _run_round_1 / _run_round_2 / _draft_outcome.
+    from unittest.mock import patch
+
+    with patch.object(orchestrator, "_run_round_1"), \
+         patch.object(orchestrator, "_deliver_round_1_pool"), \
+         patch.object(orchestrator, "_run_round_2"), \
+         patch.object(orchestrator, "_draft_outcome"):
+        orchestrator.advance_to_next_turn(session)
+
+    # Verify dirty outcome was committed AND delivered to participant
+    assert not git_ops.has_dirty_state(repo)
+    subjects = git_ops.log_subjects(repo, "main")
+    assert any("outcome confirmed: turn-1" in s for s in subjects)
+    # _strip_review_materials normalizes trailing whitespace to a single \n
+    delivered = (wt / "turn-1" / "outcome.md").read_text()
+    assert delivered.rstrip() == "USER-CONFIRMED-V2"
