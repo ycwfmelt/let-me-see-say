@@ -1,6 +1,6 @@
 # let-me-see-say
 
-> 状态：design 完成，MVP 起手中。
+> 状态：MVP 实施完成，端到端跑通过一次（见 `examples/`）。
 
 本地多模型脑暴 orchestrator。多个 participant（CLI agent，未来还有 human）就一个主题在多个 turn 里层层深入；每 turn 内分两 round（独立 + 收敛），turn 末尾产出 outcome 作为下一 turn 的种子。
 
@@ -16,11 +16,12 @@
 - [docs/decisions.md](docs/decisions.md) · ADR 决策日志
 - [docs/TODO.md](docs/TODO.md) · 延期项
 - [docs/drafts/](docs/drafts/) · 历史脑暴草稿
+- [examples/](examples/) · 端到端跑通过的真实 session 归档（含每轮答卷 + outcome）
 - [CLAUDE.md](CLAUDE.md) · 在本仓库工作的硬约束
 
 ## 用法
 
-项目用 [uv](https://docs.astral.sh/uv/) 管理依赖。
+项目用 [uv](https://docs.astral.sh/uv/) 管理依赖，需要本机已安装 `tmux`、`git`、以及订阅版 `claude` / `codex` CLI。
 
 ```bash
 # 同步依赖到 .venv（会读 pyproject.toml + uv.lock）
@@ -33,7 +34,7 @@ cp agents.toml.example agents.toml
 uv run brainstorm --help
 ```
 
-MVP 实施中，命令目前为 stub：
+实际命令：
 
 ```bash
 # 开新 session
@@ -47,10 +48,10 @@ uv run brainstorm next <session-id>
 # 查看 session 状态
 uv run brainstorm status [session-id]
 
-# 取消 session（停 TUI、归档）
+# 取消 session（停 TUI、标 cancelled，不归档）
 uv run brainstorm cancel <session-id>
 
-# 结束 session（merge + final synthesis）
+# 结束 session（merge participant 分支到 main + 关闭 TUI）
 uv run brainstorm finalize <session-id>
 ```
 
@@ -58,7 +59,7 @@ Agent profiles 在 `agents.toml`——同一个 CLI 不同 model 是不同 parti
 
 ## 状态
 
-MVP 范围严格控制（详见 CLAUDE.md "MVP 范围"）：2 agent、2 turn、文件协议、filesystem-only、`--vault` flag、不做 human / role / SQLite / MCP（协议层都已留槽位）。
+MVP 范围严格控制（详见 [CLAUDE.md](CLAUDE.md) "MVP 范围"）：2 agent profile、≥2 turn、文件协议、filesystem-only、`--vault` flag、不做 human / role / SQLite / MCP（协议层都已留槽位，详见 [docs/TODO.md](docs/TODO.md)）。
 
 ## License
 

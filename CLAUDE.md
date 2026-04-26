@@ -47,3 +47,7 @@ Agent 用长生 TUI session（`claude`、`codex` 不带 `-p` / `exec`），跨 t
 ### Obsidian
 
 Vault 是 main 分支的 worktree——人类阅读端，**不是** agent 的共享工作区。Agent 写 markdown 直接写盘，不调 Obsidian CLI；Obsidian CLI 留给 orchestrator 维护 vault 级别的 index/MOC。`.obsidian/workspace.json` 等 workspace state 必须 `.gitignore`。
+
+### 用户配置 vs 模板
+
+`agents.toml` 是用户本地 profile（可能含 token / API key 等），**已 gitignored**。仓库里 commit 的是 `agents.toml.example` 模板。修改用户 profile 不会污染 git 历史；新人 clone 后 `cp agents.toml.example agents.toml` 起手。如果有引入新的用户 / 机器特定配置，沿用同一模式（`*.example` 进 git，实际文件 gitignored）。

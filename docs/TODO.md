@@ -18,13 +18,18 @@
 
 ## 等需求触发
 
+- [ ] **LLM 起草 outcome**
+  - 当前 MVP：`_draft_outcome` 写一个空 stub（`kind: ?` + `Decision / Direction: ...`）+ 嵌入 review materials，人从零填决定区
+  - 升级：调 LLM（Anthropic API 直调最简单）读所有 round-1 + round-2 内容，自动起草决定区，人编辑修订
+  - 模板和 strip 逻辑都已就绪；只需在 `_draft_outcome` 里加 LLM 调用
+
 - [ ] **SQLite session 元数据**
   - 当前 MVP：扫 vault 目录够用
   - 触发：web UI 需要快速列 session、按 status filter 等
 
 - [ ] **MCP server**
   - 当前：纯文件协议
-  - 触发：文件协议端到端跑顺、机制验证完成后，把"工具调用"层抽成 MCP（join_room / get_my_task / submit_answer / get_round-1-pool / get_outcome），agent 改用 MCP tool 替代直接读写文件
+  - 触发：文件协议端到端跑顺（已经跑顺了 ✓），把"工具调用"层抽成 MCP（join_room / get_my_task / submit_answer / get_round-1-pool / get_outcome），agent 改用 MCP tool 替代直接读写文件
 
 - [ ] **更多 agent provider**
   - OpenRouter / Ollama / 其他
@@ -34,11 +39,26 @@
   - 协议层目录结构 `turn-N/<participant>/` 已支持任意文件类型
   - MVP 只处理 markdown；UX 设计类主题用 HTML mockup、图表、草图等等都还不行
 
+- [ ] **Codex trust 通过 config.toml 预登记（替代 post_start_keys）**
+  - 当前 MVP：`agents.toml` 里 `post_start_keys = [""]`，每个 session spawn 时自动按 Enter 接受 trust prompt
+  - 替代方案：在 `~/.codex/config.toml` 写 `[projects."<worktree-abs-path>"] trust_level = "trusted"`，永久 trust 该路径，spawn 时不再有 prompt
+  - 取舍：config 持久但每 session 都加一条 entry 会污染全局 config；keypress 路径短期更干净。先维持现状，看是否有人觉得 keypress 不可靠再切
+
 ## 可观测性 / 健壮性
+
+- [ ] **Session purge / cleanup 命令**
+  - 当前：失败的 session 要手动 `rm -rf` vault session 目录 + 本地 worktree + 杀残留 tmux
+  - 加 `brainstorm purge <session-id>`：把这三件事打包做掉
+  - 注意：操作在 finalize 之外的 session 上要警告（数据可能未归档）
 
 - [ ] **Agent 卡住的检测与恢复**
   - MVP 靠人 `tmux attach <session-name>` 看 + `brainstorm cancel <session>` 兜底
-  - 后续：超时检测、自动重启 / 降级、卡死 LLM 调用的 timeout
+  - 后续：超时检测（`wait_for_subjects` 已有 timeout）、自动重启 / 降级、卡死 LLM 调用的 timeout
+
+- [ ] **TUI ready 主动 sniff**
+  - MVP：固定 `boot_settle_seconds=8` + `post_start_delay=4`
+  - 升级：`tmux capture-pane` 看 pane content，匹配各 CLI 的 "ready" 字样（claude 的输入框 / codex 的 "Booting MCP" 完成等）后再发 wake-key
+  - 好处：消除时序假设，处理 cold start 慢的情况
 
 - [ ] **长 session 的 auto-compaction 处理**
   - Claude Code TUI 长会话自动压缩 context，>10 turn 可能丢上下文

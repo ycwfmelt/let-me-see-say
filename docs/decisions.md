@@ -162,3 +162,37 @@ env = { ANTHROPIC_OAUTH_TOKEN = "..." }
 - Branch 命名 `participant/<session>/<profile-name>`
 
 ---
+
+## ADR-006 · Outcome.md 嵌入参与者答卷供 review，投递时 strip（2026-04-27）
+
+**状态：** Accepted
+
+**决策：** `turn-N/outcome.md` 在 vault main 上同时承担两种角色：
+1. **决定区**（顶部）：给人编辑——frontmatter `kind` + `## Decision / Direction` + `## Notes`，是下一 turn 的种子
+2. **答卷参考区**（底部）：用 `<!-- BEGIN REVIEW MATERIALS -->` ... `<!-- END REVIEW MATERIALS -->` 包裹，内嵌每个 participant 的 round-1 `answer.md` + round-2 `refinement.md` 内容
+
+`_deliver_outcome_to_participants` 在投递 outcome 给下一 turn 的 participants 之前调 `_strip_review_materials` 把 marker 块整个剥掉。下一 turn 的 round-1 task 只能看到人确认的决定，看不到上一轮所有 raw 答卷。
+
+`finalize` 在 octopus merge 前也要 strip vault main 上所有 outcome.md（让 main 与 participant 分支上对齐），否则 git 会撞 content conflict。
+
+**上下文：** 用户跑第一个 session 时反馈：outcome.md 让我"review participant answers + refinements 然后 write outcome"，但 raw 答卷只在 participant 分支上（per ADR-003 不做 mid-session merge），main 上看不到。需要 `git show <branch>:<path>` 才能看，UX 不能接受。
+
+**理由：**
+- 把答卷拷到 vault main 给人看是合理的——人是 first-class reviewer，需要可见性
+- 但下一 turn 的 participant 不能看到上一轮 raw 答卷（违反 ADR-004 "outcome 是种子，不是答卷综合"——他们 round 2 看到的是匿名池，下一 turn 又看到去名字的 raw 答卷会让信息泄漏路径不对称）
+- 同一个 outcome.md 在两边角色不同，用 marker 隔开 + 投递时 strip 是最简单的方式
+- Marker 用 HTML comment 风格（`<!-- ... -->`）：对 markdown 渲染透明（Obsidian 等显示时不会显示 marker 本身）、对人编辑也清楚、对正则匹配稳定
+
+**考虑过的替代方案：**
+- 两份不同文件 `outcome.md`（给人）+ `_outcome-clean.md`（给 participant）→ 两文件状态难同步，文件多
+- 让 outcome.md 不嵌入答卷，人手动 `git show` →  UX 不可接受
+- 嵌入答卷且不剥离投递给 participant → 破坏 ADR-004 的 "outcome 是种子" 不变量
+- 把答卷作为不同文件投递（`turn-N/<name>/answer.md` 等也复制到每个 participant worktree）→ 直接破坏 round-1 互盲
+
+**结论 / 后续：**
+- `_draft_outcome` 写 outcome.md 时通过 `_build_review_materials` 嵌入参与者答卷
+- `_deliver_outcome_to_participants` 调 `_strip_review_materials` 后再写到 participant worktree
+- `finalize` 在 octopus merge 前调 `_strip_main_outcomes_for_merge` 把 main 上所有 outcome.md 也 strip 一次（让 main 与 participant 分支对齐）
+- Marker 字符串以常量形式 export 到 `orchestrator.REVIEW_BEGIN_MARKER` / `REVIEW_END_MARKER`，模板 + strip 用同一对常量保证一致
+
+---
