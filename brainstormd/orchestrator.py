@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import random
 import re
+import textwrap
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -233,8 +234,8 @@ _OUTCOME_STUB = dedent("""\
 
     # Turn {turn} — Outcome
 
-    (Human: review participant answers + refinements, then write the turn's
-    outcome here. Use `kind: decision` if the room converged on a plan;
+    (Human: read the Review materials at the bottom, then fill in this
+    section. Use `kind: decision` if the room converged on a plan;
     `kind: open-questions` if new questions arose; `kind: summary` for
     a general digest.)
 
@@ -247,9 +248,59 @@ _OUTCOME_STUB = dedent("""\
     ...
 """)
 
+# Markers wrapping the human-review-only block. `advance_to_next_turn` strips
+# everything between these (inclusive) before delivering outcome to next turn.
+REVIEW_BEGIN_MARKER = "<!-- BEGIN REVIEW MATERIALS (stripped before next-turn delivery) -->"
+REVIEW_END_MARKER = "<!-- END REVIEW MATERIALS -->"
+
+_REVIEW_BLOCK_RE = re.compile(
+    re.escape(REVIEW_BEGIN_MARKER) + r".*?" + re.escape(REVIEW_END_MARKER) + r"\n*",
+    re.DOTALL,
+)
+
 
 def _outcome_stub(turn: int) -> str:
     return _OUTCOME_STUB.format(turn=turn)
+
+
+def _strip_review_materials(content: str) -> str:
+    """Remove the REVIEW MATERIALS block (inclusive of markers) from outcome.md.
+
+    Used when delivering outcome to next turn's participants — they should see
+    the human-confirmed outcome only, not the raw round-1/round-2 submissions.
+    """
+    return _REVIEW_BLOCK_RE.sub("", content).rstrip() + "\n"
+
+
+def _build_review_materials(submissions: list[tuple[str, str, str]]) -> str:
+    """Render the participants' answer + refinement as a markdown block.
+
+    `submissions` is [(participant_name, round_1_answer, round_2_refinement)].
+    """
+    parts = [
+        REVIEW_BEGIN_MARKER,
+        "",
+        "# Review materials — participant submissions",
+        "",
+        "_For your review only. This block is automatically stripped from the_",
+        "_outcome before it's delivered to next turn's participants._",
+        "",
+    ]
+    for name, answer, refinement in submissions:
+        parts.append(f"## {name}")
+        parts.append("")
+        parts.append("### Round 1 — independent answer")
+        parts.append("")
+        parts.append(answer.rstrip() or "_(no answer recorded)_")
+        parts.append("")
+        parts.append("### Round 2 — refinement after seeing the anonymized pool")
+        parts.append("")
+        parts.append(refinement.rstrip() or "_(no refinement recorded)_")
+        parts.append("")
+        parts.append("---")
+        parts.append("")
+    parts.append(REVIEW_END_MARKER)
+    return "\n".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -352,12 +403,41 @@ def _run_round_2(session: Session, timeout: float = 600.0) -> None:
 
 
 def _draft_outcome(session: Session) -> None:
-    """MVP: write a stub outcome.md to vault main; human edits then runs `next`."""
+    """Write outcome.md to vault main: stub for human to fill + a Review block
+    embedding each participant's round-1 answer and round-2 refinement (read
+    from their branches via `git show`, no merge per ADR-003).
+
+    The Review block is delimited by markers and stripped by
+    `_deliver_outcome_to_participants` before next-turn delivery, so next
+    turn's participants see only the human-confirmed outcome (per ADR-004).
+    """
     outcome_path = (
         session.repo_path / f"turn-{session.current_turn}" / "outcome.md"
     )
     outcome_path.parent.mkdir(parents=True, exist_ok=True)
-    outcome_path.write_text(_outcome_stub(session.current_turn))
+
+    # Read each participant's round-1 answer and round-2 refinement
+    submissions: list[tuple[str, str, str]] = []
+    for p in session.participants:
+        ans_path = f"turn-{session.current_turn}/{p.name}/answer.md"
+        ref_path = f"turn-{session.current_turn}/{p.name}/refinement.md"
+        try:
+            answer = git_ops.show_file(session.repo_path, p.branch, ans_path)
+        except git_ops.GitError:
+            answer = ""
+        try:
+            refinement = git_ops.show_file(session.repo_path, p.branch, ref_path)
+        except git_ops.GitError:
+            refinement = ""
+        submissions.append((p.name, answer, refinement))
+
+    content = (
+        _outcome_stub(session.current_turn).rstrip()
+        + "\n\n"
+        + _build_review_materials(submissions)
+        + "\n"
+    )
+    outcome_path.write_text(content)
     git_ops.commit(
         session.repo_path,
         f"draft outcome: turn-{session.current_turn}",
@@ -367,13 +447,17 @@ def _draft_outcome(session: Session) -> None:
 
 def _deliver_outcome_to_participants(session: Session) -> None:
     """Copy the (human-confirmed) outcome from vault main to each participant's
-    worktree and commit on their branch."""
+    worktree and commit on their branch.
+
+    Strips the human-only Review materials block (per ADR-004 — next turn's
+    participants see the outcome only, not raw round-1/round-2 submissions).
+    """
     outcome_src = (
         session.repo_path / f"turn-{session.current_turn}" / "outcome.md"
     )
     if not outcome_src.exists():
         raise RuntimeError(f"Cannot deliver outcome: {outcome_src} missing")
-    content = outcome_src.read_text()
+    content = _strip_review_materials(outcome_src.read_text())
     for p in session.participants:
         outcome_dst = (
             p.worktree_path / f"turn-{session.current_turn}" / "outcome.md"

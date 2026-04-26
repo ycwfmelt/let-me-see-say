@@ -15,12 +15,18 @@ from pathlib import Path
 from brainstormd import git_ops, orchestrator
 from brainstormd.orchestrator import (
     PHASE_OUTCOME_PENDING,
+    REVIEW_BEGIN_MARKER,
+    REVIEW_END_MARKER,
     Session,
+    _build_review_materials,
+    _draft_outcome,
+    _deliver_outcome_to_participants,
     _generate_round_1_pool,
     _generate_session_id,
     _outcome_stub,
     _resolve_session_paths,
     _slugify,
+    _strip_review_materials,
     load_session,
 )
 from brainstormd.participant import AgentProfile, Human, TUIAgent
@@ -140,6 +146,157 @@ def test_outcome_stub_includes_turn_and_kind_options():
     assert "decision" in text
     assert "open-questions" in text
     assert "summary" in text
+
+
+# ---------------------------------------------------------------------------
+# Review materials: build, embed, strip
+# ---------------------------------------------------------------------------
+
+
+def test_build_review_materials_includes_each_participant_block():
+    submissions = [
+        ("alice", "ALICE-ROUND-1", "ALICE-ROUND-2"),
+        ("bob", "BOB-ROUND-1", "BOB-ROUND-2"),
+    ]
+    text = _build_review_materials(submissions)
+    assert REVIEW_BEGIN_MARKER in text
+    assert REVIEW_END_MARKER in text
+    assert "## alice" in text
+    assert "ALICE-ROUND-1" in text
+    assert "ALICE-ROUND-2" in text
+    assert "## bob" in text
+    assert "BOB-ROUND-1" in text
+    assert "BOB-ROUND-2" in text
+
+
+def test_build_review_materials_handles_missing_content():
+    submissions = [("alice", "", "")]
+    text = _build_review_materials(submissions)
+    assert "## alice" in text
+    assert "no answer recorded" in text
+    assert "no refinement recorded" in text
+
+
+def test_strip_review_materials_removes_marked_block():
+    content = (
+        "# outcome\n\n"
+        "## Decision\nFoo decision\n\n"
+        + REVIEW_BEGIN_MARKER
+        + "\n## hidden\nshould-not-leak\n"
+        + REVIEW_END_MARKER
+        + "\n"
+    )
+    stripped = _strip_review_materials(content)
+    assert "Foo decision" in stripped
+    assert "should-not-leak" not in stripped
+    assert "hidden" not in stripped
+    assert REVIEW_BEGIN_MARKER not in stripped
+    assert REVIEW_END_MARKER not in stripped
+
+
+def test_strip_review_materials_passthrough_when_no_block():
+    content = "# outcome\n\n## Decision\nNo block here\n"
+    assert _strip_review_materials(content).rstrip() == content.rstrip()
+
+
+def test_draft_outcome_embeds_participant_submissions(tmp_path: Path):
+    """End-to-end check: _draft_outcome reads from each participant branch and
+    embeds answer + refinement into outcome.md."""
+    from brainstormd.participant import AgentProfile, TUIAgent
+
+    repo = tmp_path / "vault"
+    git_ops.init_repo(repo)
+    git_ops.configure_user(repo, "test", "t@e.com")
+    (repo / "00_topic.md").write_text("topic")
+    git_ops.commit(repo, "init")
+
+    # Set up a participant with answer + refinement on its branch
+    wt = tmp_path / "wt-alice"
+    git_ops.add_worktree(repo, wt, branch="participant/sess/alice")
+    (wt / "turn-1" / "alice").mkdir(parents=True)
+    (wt / "turn-1" / "alice" / "answer.md").write_text("ALICE-ANSWER-CONTENT")
+    (wt / "turn-1" / "alice" / "refinement.md").write_text(
+        "ALICE-REFINEMENT-CONTENT"
+    )
+    git_ops.commit(wt, "alice work")
+
+    profile = AgentProfile(name="alice", cli="bash")
+    agent = TUIAgent(name="alice", session_id="sess", worktree_path=wt, profile=profile)
+
+    workspaces = tmp_path / "wk"
+    workspaces.mkdir()
+    session = Session(
+        session_id="sess",
+        topic="t",
+        vault_path=tmp_path,
+        repo_path=repo,
+        private_workspaces=workspaces,
+        participants=[agent],
+        current_turn=1,
+    )
+
+    _draft_outcome(session)
+
+    outcome_path = repo / "turn-1" / "outcome.md"
+    assert outcome_path.exists()
+    content = outcome_path.read_text()
+    # Stub for human edits is there
+    assert "Decision / Direction" in content
+    # Review materials block is there
+    assert REVIEW_BEGIN_MARKER in content
+    assert "## alice" in content
+    assert "ALICE-ANSWER-CONTENT" in content
+    assert "ALICE-REFINEMENT-CONTENT" in content
+    assert REVIEW_END_MARKER in content
+
+
+def test_deliver_outcome_strips_review_materials(tmp_path: Path):
+    """Verify next-turn delivery strips the Review block."""
+    from brainstormd.participant import AgentProfile, TUIAgent
+
+    repo = tmp_path / "vault"
+    git_ops.init_repo(repo)
+    git_ops.configure_user(repo, "t", "t@e.com")
+    (repo / "00_topic.md").write_text("topic")
+    git_ops.commit(repo, "init")
+
+    wt = tmp_path / "wt"
+    git_ops.add_worktree(repo, wt, branch="participant/sess/alice")
+
+    # Build an outcome.md with both human content and a review block
+    outcome_path = repo / "turn-1" / "outcome.md"
+    outcome_path.parent.mkdir(parents=True)
+    outcome_path.write_text(
+        "---\nturn: 1\nkind: summary\n---\n\n"
+        "# Outcome\n\n## Decision\nHUMAN-CONFIRMED-DECISION\n\n"
+        + REVIEW_BEGIN_MARKER
+        + "\n## participant raw\nshould-not-leak-to-next-turn\n"
+        + REVIEW_END_MARKER
+        + "\n"
+    )
+    git_ops.commit(repo, "draft outcome turn-1")
+
+    profile = AgentProfile(name="alice", cli="bash")
+    agent = TUIAgent(name="alice", session_id="sess", worktree_path=wt, profile=profile)
+    workspaces = tmp_path / "wk"
+    workspaces.mkdir()
+    session = Session(
+        session_id="sess",
+        topic="t",
+        vault_path=tmp_path,
+        repo_path=repo,
+        private_workspaces=workspaces,
+        participants=[agent],
+        current_turn=1,
+    )
+
+    _deliver_outcome_to_participants(session)
+
+    delivered = (wt / "turn-1" / "outcome.md").read_text()
+    assert "HUMAN-CONFIRMED-DECISION" in delivered
+    assert "should-not-leak-to-next-turn" not in delivered
+    assert REVIEW_BEGIN_MARKER not in delivered
+    assert REVIEW_END_MARKER not in delivered
 
 
 # ---------------------------------------------------------------------------
