@@ -8,9 +8,17 @@ ADR-005, wake is decoupled from task content (which lives in
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import libtmux
+
+
+# Delay between typing text and pressing Enter when both are requested in one
+# send_keys call. Without this, fast TUIs (codex, etc.) can drop the Enter or
+# treat it as a newline-within-input because the TUI hasn't finished ingesting
+# the typed characters by the time Enter arrives.
+_TYPE_ENTER_DELAY = 0.3
 
 
 class TmuxError(RuntimeError):
@@ -97,12 +105,28 @@ def list_sessions(prefix: str | None = None) -> list[str]:
 def send_keys(name: str, text: str, enter: bool = True) -> None:
     """Send `text` to the session's first pane, optionally followed by Enter.
 
-    This is the wake mechanism per ADR-005. Keep `text` short — the canonical
-    instruction lives in `.brainstorm/task.md`; send-keys is just the trigger
-    (e.g., 'Read .brainstorm/task.md and proceed.').
+    Wake mechanism per ADR-005 — keep `text` short; canonical instruction
+    lives in `.brainstorm/task.md`.
+
+    When both text and Enter are requested, types the text first, sleeps
+    briefly to let the receiving TUI ingest the characters, then sends Enter
+    separately. This avoids a race where Enter arrives before the TUI has
+    consumed the typed text — observed with codex, where the symptom was
+    text appearing in the input box but Enter being treated as a newline
+    rather than a submit (so message never sent).
     """
     pane = _require_pane(name)
-    pane.send_keys(text, enter=enter)
+    if not text:
+        if enter:
+            # Just an Enter keypress; bypass the empty-string-arg quirk by
+            # using libtmux's enter() (sends "Enter" key directly).
+            pane.enter()
+        return
+    # Type text only (no Enter)
+    pane.send_keys(text, enter=False)
+    if enter:
+        time.sleep(_TYPE_ENTER_DELAY)
+        pane.enter()
 
 
 def capture_pane(name: str, max_lines: int | None = None) -> str:

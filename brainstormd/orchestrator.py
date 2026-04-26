@@ -400,7 +400,7 @@ def create_session(
     base_workspaces: Path | str,
     git_user_name: str = "brainstormd",
     git_user_email: str = "brainstormd@let-me-see-say.local",
-    boot_settle_seconds: float = 5.0,
+    boot_settle_seconds: float = 8.0,
 ) -> Session:
     """Phase 0..4: setup → boot → round 1 → pool + round 2 → outcome stub.
 
