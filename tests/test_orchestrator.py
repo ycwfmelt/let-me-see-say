@@ -486,6 +486,74 @@ def test_finalize_clean_state_no_outcome_capture_commit(tmp_path: Path):
     assert not any("outcome edits captured before finalize" in s for s in subjects)
 
 
+def test_finalize_strips_review_materials_on_main_before_merge(tmp_path: Path):
+    """User-reported octopus conflict: main had `turn-N/outcome.md` with
+    review materials; participant branch had it stripped → content conflict
+    at merge. Fix: strip main first so all branches agree, merge succeeds."""
+    from brainstormd.participant import AgentProfile, TUIAgent
+    from brainstormd.orchestrator import REVIEW_BEGIN_MARKER, REVIEW_END_MARKER
+
+    repo = tmp_path / "vault"
+    git_ops.init_repo(repo)
+    git_ops.configure_user(repo, "t", "t@e.com")
+    (repo / "shared.md").write_text("shared")
+    git_ops.commit(repo, "init")
+
+    # Two participant branches with stripped outcome + their own work
+    wt_a = tmp_path / "wt-a"
+    git_ops.add_worktree(repo, wt_a, branch="participant/s/alice")
+    (wt_a / "turn-1").mkdir()
+    (wt_a / "turn-1" / "outcome.md").write_text("CLEAN-OUTCOME\n")
+    (wt_a / "alice-stuff.md").write_text("alice")
+    git_ops.commit(wt_a, "alice")
+
+    wt_b = tmp_path / "wt-b"
+    git_ops.add_worktree(repo, wt_b, branch="participant/s/bob")
+    (wt_b / "turn-1").mkdir()
+    (wt_b / "turn-1" / "outcome.md").write_text("CLEAN-OUTCOME\n")
+    (wt_b / "bob-stuff.md").write_text("bob")
+    git_ops.commit(wt_b, "bob")
+
+    # Main has outcome.md WITH review materials block (different content)
+    (repo / "turn-1").mkdir()
+    (repo / "turn-1" / "outcome.md").write_text(
+        "CLEAN-OUTCOME\n\n"
+        + REVIEW_BEGIN_MARKER + "\n"
+        + "raw participant data\n"
+        + REVIEW_END_MARKER + "\n"
+    )
+    git_ops.commit(repo, "main outcome w/ review materials")
+
+    profile = AgentProfile(name="x", cli="bash")
+    a = TUIAgent(name="alice", session_id="s", worktree_path=wt_a, profile=profile)
+    b = TUIAgent(name="bob", session_id="s", worktree_path=wt_b, profile=profile)
+    workspaces = tmp_path / "wk"
+    workspaces.mkdir()
+    session = Session(
+        session_id="s",
+        topic="t",
+        vault_path=tmp_path,
+        repo_path=repo,
+        private_workspaces=workspaces,
+        participants=[a, b],
+        current_turn=1,
+    )
+
+    # Pre-fix would have failed with octopus content conflict; should succeed now
+    orchestrator.finalize(session)
+
+    final = (repo / "turn-1" / "outcome.md").read_text()
+    assert "CLEAN-OUTCOME" in final
+    assert REVIEW_BEGIN_MARKER not in final
+    assert "raw participant data" not in final
+    # Both participant work landed on main via the merge
+    assert (repo / "alice-stuff.md").exists()
+    assert (repo / "bob-stuff.md").exists()
+    # Strip-commit subject is in history
+    subjects = git_ops.log_subjects(repo, "main")
+    assert any("strip review materials before finalize merge" in s for s in subjects)
+
+
 def test_advance_to_next_turn_commits_dirty_outcome_first(tmp_path: Path):
     """advance_to_next_turn should auto-commit dirty outcome.md before delivery."""
     from brainstormd.participant import AgentProfile, TUIAgent

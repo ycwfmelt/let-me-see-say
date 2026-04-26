@@ -444,6 +444,28 @@ def _draft_outcome(session: Session) -> None:
     )
 
 
+def _strip_main_outcomes_for_merge(session: Session) -> None:
+    """Strip the review-materials block from each `turn-N/outcome.md` on main.
+
+    `_draft_outcome` writes outcome.md with the review block embedded (so the
+    human can read submissions inline). `_deliver_outcome_to_participants`
+    strips the block before delivering to participants. At finalize, main's
+    outcome.md (with review block) and the participants' (stripped) end up
+    being the same path with different content — octopus merge refuses
+    because it can't auto-resolve content conflicts. Stripping main here
+    aligns the file with what's on participant branches, letting merge
+    succeed; the per-participant `answer.md` / `refinement.md` files brought
+    in by the merge then make the raw submissions visible on main directly.
+    """
+    for turn_dir in sorted(session.repo_path.glob("turn-*")):
+        outcome = turn_dir / "outcome.md"
+        if outcome.exists():
+            outcome.write_text(_strip_review_materials(outcome.read_text()))
+    _commit_pending_main_changes(
+        session, "strip review materials before finalize merge"
+    )
+
+
 def _commit_pending_main_changes(session: Session, message: str) -> None:
     """If main's working tree has uncommitted changes (typically human edits
     to outcome.md), stage and commit them with `message`.
@@ -629,6 +651,11 @@ def finalize(session: Session) -> Session:
     _commit_pending_main_changes(
         session, "outcome edits captured before finalize"
     )
+    # Align main's outcome.md with the (stripped) version that participants
+    # have on their branches; otherwise octopus merge sees different content
+    # at the same path and bails. Per-participant answer.md / refinement.md
+    # arriving via the merge make the raw submissions visible on main.
+    _strip_main_outcomes_for_merge(session)
 
     branches = [p.branch for p in session.participants]
     git_ops.merge_branches(
