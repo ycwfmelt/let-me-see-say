@@ -486,6 +486,60 @@ def test_finalize_clean_state_no_outcome_capture_commit(tmp_path: Path):
     assert not any("outcome edits captured before finalize" in s for s in subjects)
 
 
+def test_finalize_drops_diverging_task_md_from_participants(tmp_path: Path):
+    """User-reported octopus conflict on .brainstorm/task.md: each participant
+    branch had a different task.md (different phase / different name in the
+    content). Fix: drop task.md from all participants before merge."""
+    from brainstormd.participant import AgentProfile, TUIAgent
+
+    repo = tmp_path / "vault"
+    git_ops.init_repo(repo)
+    git_ops.configure_user(repo, "t", "t@e.com")
+    (repo / "shared.md").write_text("shared")
+    git_ops.commit(repo, "init")
+
+    wt_a = tmp_path / "wt-a"
+    git_ops.add_worktree(repo, wt_a, branch="participant/s/alice")
+    (wt_a / ".brainstorm").mkdir()
+    (wt_a / ".brainstorm" / "task.md").write_text("ALICE TASK content")
+    (wt_a / "alice-stuff.md").write_text("alice")
+    git_ops.commit(wt_a, "alice work + task.md")
+
+    wt_b = tmp_path / "wt-b"
+    git_ops.add_worktree(repo, wt_b, branch="participant/s/bob")
+    (wt_b / ".brainstorm").mkdir()
+    (wt_b / ".brainstorm" / "task.md").write_text("BOB TASK content")
+    (wt_b / "bob-stuff.md").write_text("bob")
+    git_ops.commit(wt_b, "bob work + task.md")
+
+    profile = AgentProfile(name="x", cli="bash")
+    a = TUIAgent(name="alice", session_id="s", worktree_path=wt_a, profile=profile)
+    b = TUIAgent(name="bob", session_id="s", worktree_path=wt_b, profile=profile)
+    workspaces = tmp_path / "wk"
+    workspaces.mkdir()
+    session = Session(
+        session_id="s",
+        topic="t",
+        vault_path=tmp_path,
+        repo_path=repo,
+        private_workspaces=workspaces,
+        participants=[a, b],
+        current_turn=1,
+    )
+
+    # Pre-fix would have hit "content conflict in .brainstorm/task.md"
+    orchestrator.finalize(session)
+
+    # task.md gone everywhere; participant work landed
+    assert not (repo / ".brainstorm" / "task.md").exists()
+    assert (repo / "alice-stuff.md").exists()
+    assert (repo / "bob-stuff.md").exists()
+    # The drop commits show up on each participant branch
+    for branch, name in [("participant/s/alice", "alice"), ("participant/s/bob", "bob")]:
+        subjects = git_ops.log_subjects(repo, branch)
+        assert any(f"drop task.md before finalize: {name}" in s for s in subjects)
+
+
 def test_finalize_strips_review_materials_on_main_before_merge(tmp_path: Path):
     """User-reported octopus conflict: main had `turn-N/outcome.md` with
     review materials; participant branch had it stripped → content conflict

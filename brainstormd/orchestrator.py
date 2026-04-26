@@ -444,6 +444,33 @@ def _draft_outcome(session: Session) -> None:
     )
 
 
+def _drop_task_md_from_participants(session: Session) -> None:
+    """Remove `.brainstorm/task.md` from each participant's worktree and commit
+    the deletion on their branch.
+
+    Why: orchestrator writes a different task.md content to each participant
+    every phase (and the content embeds the participant's name + phase, so
+    branches diverge on this file). At finalize time the octopus merge sees
+    the same path with different content on each branch and can't combine
+    them — git refuses with a content conflict on `.brainstorm/task.md`.
+
+    Other `.brainstorm/` paths don't have this problem:
+      - rules.md is identical across branches (came from main at fork)
+      - round-1-pool.md is identical across branches at any one turn
+      - status/<phase>.<name>.md uses unique-per-participant paths
+    """
+    for p in session.participants:
+        task_md = p.worktree_path / ".brainstorm" / "task.md"
+        if not task_md.exists():
+            continue
+        task_md.unlink()
+        git_ops.commit(
+            p.worktree_path,
+            f"drop task.md before finalize: {p.name}",
+            files=[".brainstorm/task.md"],
+        )
+
+
 def _strip_main_outcomes_for_merge(session: Session) -> None:
     """Strip the review-materials block from each `turn-N/outcome.md` on main.
 
@@ -656,6 +683,10 @@ def finalize(session: Session) -> Session:
     # at the same path and bails. Per-participant answer.md / refinement.md
     # arriving via the merge make the raw submissions visible on main.
     _strip_main_outcomes_for_merge(session)
+    # Drop `.brainstorm/task.md` from each participant — content varies by
+    # participant + phase, so it would conflict on octopus merge. Other
+    # `.brainstorm/` paths are either identical across branches or unique.
+    _drop_task_md_from_participants(session)
 
     branches = [p.branch for p in session.participants]
     git_ops.merge_branches(
