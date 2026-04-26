@@ -160,6 +160,8 @@ def _make_test_session(tmp_path: Path) -> Session:
         cli="claude",
         flags=["--model", "sonnet"],
         env={"K": "V"},
+        post_start_keys=["", "1"],
+        post_start_delay=6.0,
     )
     agent = TUIAgent(
         name="claude-sonnet",
@@ -196,6 +198,8 @@ def test_session_manifest_roundtrip_tuiagent(tmp_path: Path):
     assert p.profile.cli == "claude"
     assert p.profile.flags == ["--model", "sonnet"]
     assert p.profile.env == {"K": "V"}
+    assert p.profile.post_start_keys == ["", "1"]
+    assert p.profile.post_start_delay == 6.0
     assert p.worktree_path == session.participants[0].worktree_path
     assert p.branch == "participant/test-session/claude-sonnet"
 

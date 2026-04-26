@@ -19,6 +19,9 @@ flags = ["--model", "opus"]
 [agents.codex]
 cli = "codex"
 flags = []
+# Codex shows "Do you trust this directory?" on first launch in an unfamiliar
+# dir; sending Enter accepts the default ("Yes, continue") and lets the TUI load.
+post_start_keys = [""]
 
 # Example with env injection:
 # [agents.claude-with-custom-token]

@@ -93,6 +93,8 @@ def _serialize_participant(p: Participant) -> dict:
             "cli": p.profile.cli,
             "flags": p.profile.flags,
             "env": p.profile.env,
+            "post_start_keys": p.profile.post_start_keys,
+            "post_start_delay": p.profile.post_start_delay,
         }
         base["tmux_session_name"] = p.tmux_session_name
     return base
@@ -113,6 +115,8 @@ def load_session(session_id: str, base_workspaces: Path | str) -> Session:
                 cli=p_data["profile"]["cli"],
                 flags=list(p_data["profile"]["flags"]),
                 env=dict(p_data["profile"]["env"]),
+                post_start_keys=list(p_data["profile"].get("post_start_keys", [])),
+                post_start_delay=float(p_data["profile"].get("post_start_delay", 4.0)),
             )
             participants.append(
                 TUIAgent(
@@ -396,7 +400,7 @@ def create_session(
     base_workspaces: Path | str,
     git_user_name: str = "brainstormd",
     git_user_email: str = "brainstormd@let-me-see-say.local",
-    boot_settle_seconds: float = 2.0,
+    boot_settle_seconds: float = 5.0,
 ) -> Session:
     """Phase 0..4: setup → boot → round 1 → pool + round 2 → outcome stub.
 

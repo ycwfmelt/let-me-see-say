@@ -16,6 +16,7 @@ MVP only implements TUIAgent. Human is a stub raising NotImplementedError.
 from __future__ import annotations
 
 import shlex
+import time
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -37,12 +38,20 @@ class AgentProfile:
     underlying CLI binary: `claude-sonnet` and `claude-opus` are two profiles
     using the same `claude` CLI with different `--model` flags. Protocol layer
     only sees profile names.
+
+    `post_start_keys` is a list of strings sent (each followed by Enter) after
+    the CLI has been spawned and `post_start_delay` seconds have elapsed.
+    Used for CLIs that require an initial confirmation — e.g. codex shows
+    "Do you trust this directory?" on first run in an unfamiliar dir;
+    `post_start_keys = [""]` (an empty string + Enter) accepts the default.
     """
 
     name: str
     cli: str
     flags: list[str] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=dict)
+    post_start_keys: list[str] = field(default_factory=list)
+    post_start_delay: float = 4.0
 
 
 def load_agent_profiles(path: Path | str) -> dict[str, AgentProfile]:
@@ -57,6 +66,8 @@ def load_agent_profiles(path: Path | str) -> dict[str, AgentProfile]:
             cli=cfg["cli"],
             flags=list(cfg.get("flags", [])),
             env=dict(cfg.get("env", {})),
+            post_start_keys=list(cfg.get("post_start_keys", [])),
+            post_start_delay=float(cfg.get("post_start_delay", 4.0)),
         )
     return profiles
 
@@ -118,7 +129,13 @@ class TUIAgent:
         return f"brainstorm-{self.session_id}-{self.name}"
 
     def start(self) -> None:
-        """Create tmux session at worktree_path, launch CLI with profile env + flags."""
+        """Create tmux session at worktree_path, launch CLI with profile env + flags.
+
+        If profile.post_start_keys is non-empty, blocks for post_start_delay
+        seconds after spawning the CLI, then types each post_start_key (with
+        Enter) — used for CLIs like codex that show a "trust this directory?"
+        prompt on first launch.
+        """
         tmux_ops.new_session(self.tmux_session_name, cwd=self.worktree_path)
         # Build: KEY=val ... cli flag1 flag2 ...
         parts: list[str] = []
@@ -127,6 +144,12 @@ class TUIAgent:
         parts.append(shlex.quote(self.profile.cli))
         parts.extend(shlex.quote(f) for f in self.profile.flags)
         tmux_ops.send_keys(self.tmux_session_name, " ".join(parts), enter=True)
+
+        if self.profile.post_start_keys:
+            time.sleep(self.profile.post_start_delay)
+            for key in self.profile.post_start_keys:
+                tmux_ops.send_keys(self.tmux_session_name, key, enter=True)
+                time.sleep(0.3)
 
     def wake_for(self, phase: str) -> None:
         """Trigger the agent to read its current task.

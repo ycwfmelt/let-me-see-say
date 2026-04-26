@@ -59,6 +59,28 @@ def test_load_agent_profiles_empty_when_no_agents(tmp_path: Path):
     assert load_agent_profiles(toml_file) == {}
 
 
+def test_load_agent_profile_with_post_start_keys(tmp_path: Path):
+    toml_file = tmp_path / "agents.toml"
+    toml_file.write_text(
+        '[agents.codex]\n'
+        'cli = "codex"\n'
+        'post_start_keys = [""]\n'
+        'post_start_delay = 5.0\n'
+    )
+    profiles = load_agent_profiles(toml_file)
+    assert profiles["codex"].post_start_keys == [""]
+    assert profiles["codex"].post_start_delay == 5.0
+
+
+def test_load_agent_profile_post_start_defaults(tmp_path: Path):
+    """If post_start_keys / post_start_delay omitted, defaults are empty + 4.0."""
+    toml_file = tmp_path / "agents.toml"
+    toml_file.write_text('[agents.x]\ncli = "x"\n')
+    profiles = load_agent_profiles(toml_file)
+    assert profiles["x"].post_start_keys == []
+    assert profiles["x"].post_start_delay == 4.0
+
+
 # ---------------------------------------------------------------------------
 # Branch / tmux_session_name derivation (pure logic, no tmux required)
 # ---------------------------------------------------------------------------
@@ -211,3 +233,30 @@ def test_tuiagent_stop_is_idempotent(
     agent.stop()
     agent.stop()  # should not raise
     assert not tmux_ops.session_exists(agent.tmux_session_name)
+
+
+@requires_tmux
+def test_tuiagent_start_executes_post_start_keys(
+    tmp_path: Path, cleanup_sessions: list[str]
+):
+    """post_start_keys are sent after post_start_delay; verify by typing a
+    marker echo as a post-start key and confirming it executes."""
+    profile = AgentProfile(
+        name="ps",
+        cli="bash",
+        flags=[],
+        env={},
+        post_start_keys=["echo POST-START-MARKER-12345"],
+        post_start_delay=0.5,  # fast for test
+    )
+    agent = TUIAgent(
+        name="ps",
+        session_id="postsess",
+        worktree_path=tmp_path,
+        profile=profile,
+    )
+    cleanup_sessions.append(agent.tmux_session_name)
+    agent.start()  # blocks 0.5s + sends marker, ~1s total
+    time.sleep(1.0)  # wait for shell to render
+    pane = tmux_ops.capture_pane(agent.tmux_session_name)
+    assert "POST-START-MARKER-12345" in pane
