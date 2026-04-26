@@ -1,0 +1,26 @@
+# Agent profiles. Each profile is a participant the orchestrator can spawn.
+# Profile name = participant identity (used in branch / paths / status files).
+# Profile fields:
+#   cli   — the executable to launch (must be on PATH)
+#   flags — list of CLI args
+#   env   — optional env vars injected into the subprocess (like `KEY=val claude ...`)
+#
+# Same CLI with different flags / env is a DIFFERENT participant (e.g. claude-sonnet vs
+# claude-opus). Protocol layer only sees profile names, not what's behind them.
+
+[agents.claude-sonnet]
+cli = "claude"
+flags = ["--model", "sonnet"]
+
+[agents.claude-opus]
+cli = "claude"
+flags = ["--model", "opus"]
+
+[agents.codex]
+cli = "codex"
+flags = []
+
+# Example with env injection:
+# [agents.claude-with-custom-token]
+# cli = "claude"
+# env = { ANTHROPIC_OAUTH_TOKEN = "sk-..." }
