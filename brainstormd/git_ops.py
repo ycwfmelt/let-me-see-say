@@ -238,7 +238,19 @@ def merge_branches(
 
 
 def current_branch(repo_path: Path | str) -> str:
-    """Return the current branch name (or 'HEAD' if detached)."""
+    """Return the current branch name (or 'HEAD' if detached).
+
+    Works on empty repos: uses `symbolic-ref` first which doesn't require any
+    commits, falling back to `rev-parse` only for the detached-HEAD case.
+    """
+    proc = _run(
+        ["symbolic-ref", "--short", "HEAD"],
+        cwd=repo_path,
+        check=False,
+    )
+    if proc.returncode == 0:
+        return proc.stdout.strip()
+    # Detached HEAD: symbolic-ref errors, fall back to rev-parse
     return _run(["rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_path).stdout.strip()
 
 
