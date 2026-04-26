@@ -73,11 +73,23 @@ def add_worktree(
     branch: str,
     base: str = "main",
 ) -> None:
-    """Create a new worktree at `worktree_path` on a NEW branch (forked from `base`)."""
-    _run(
-        ["worktree", "add", "-b", branch, str(worktree_path), base],
-        cwd=repo_path,
-    )
+    """Create a new worktree at `worktree_path`.
+
+    If `branch` already exists, attach it (omit `-b`); otherwise create the
+    branch from `base`. This makes retry-after-partial-failure safer: if a
+    prior run left the branch behind but the local worktree got cleaned up,
+    we can resume without having to delete the branch.
+    """
+    if branch_exists(repo_path, branch):
+        _run(
+            ["worktree", "add", str(worktree_path), branch],
+            cwd=repo_path,
+        )
+    else:
+        _run(
+            ["worktree", "add", "-b", branch, str(worktree_path), base],
+            cwd=repo_path,
+        )
 
 
 def remove_worktree(

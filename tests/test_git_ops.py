@@ -100,6 +100,21 @@ def test_show_file_at_different_refs(tmp_path: Path):
 # ---------------------------------------------------------------------------
 
 
+def test_add_worktree_attaches_existing_branch(tmp_path: Path):
+    """If branch already exists, add_worktree attaches it instead of erroring."""
+    repo = make_repo(tmp_path / "repo")
+    write_and_commit(repo, "main.txt", "1", "init")
+    # Create the branch directly (no worktree)
+    git_ops._run(["branch", "feature/preexisting"], cwd=repo)
+    assert git_ops.branch_exists(repo, "feature/preexisting")
+
+    # add_worktree should attach the existing branch, not error
+    wt = tmp_path / "wt"
+    git_ops.add_worktree(repo, wt, branch="feature/preexisting")
+    assert wt.exists()
+    assert git_ops.current_branch(wt) == "feature/preexisting"
+
+
 def test_add_worktree_inherits_main_then_diverges(tmp_path: Path):
     repo = make_repo(tmp_path / "repo")
     write_and_commit(repo, "main.txt", "main content", "main only")
