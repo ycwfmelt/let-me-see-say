@@ -100,7 +100,7 @@ def _serialize_participant(p: Participant) -> dict:
 
 def load_session(session_id: str, base_workspaces: Path | str) -> Session:
     """Load a session from `base_workspaces/<session_id>/session.json`."""
-    base_workspaces = Path(base_workspaces)
+    base_workspaces = Path(base_workspaces).expanduser().resolve()
     manifest_path = base_workspaces / session_id / "session.json"
     if not manifest_path.exists():
         raise FileNotFoundError(f"No session manifest at {manifest_path}")
@@ -141,6 +141,28 @@ def load_session(session_id: str, base_workspaces: Path | str) -> Session:
         participants=participants,
         current_turn=data["current_turn"],
         current_phase=data["current_phase"],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Path resolution
+# ---------------------------------------------------------------------------
+
+
+def _resolve_session_paths(
+    vault_path: Path | str,
+    base_workspaces: Path | str,
+) -> tuple[Path, Path]:
+    """Expand `~` and resolve to absolute.
+
+    Critical: subprocess `cwd=` and `git -C` need unambiguous absolute paths.
+    Without this, `Path("~/Obsidian")` is treated literally by Python (creating
+    a directory called `~`!), and a relative `private-workspaces` path gets
+    re-rooted at whatever cwd `git -C` lands in.
+    """
+    return (
+        Path(vault_path).expanduser().resolve(),
+        Path(base_workspaces).expanduser().resolve(),
     )
 
 
@@ -382,8 +404,7 @@ def create_session(
     drafted `turn-1/outcome.md` and then runs `brainstorm next` (which calls
     `advance_to_next_turn`).
     """
-    vault_path = Path(vault_path)
-    base_workspaces = Path(base_workspaces)
+    vault_path, base_workspaces = _resolve_session_paths(vault_path, base_workspaces)
 
     session_id = _generate_session_id(topic)
     repo_path = vault_path / "Brainstorm" / "sessions" / session_id

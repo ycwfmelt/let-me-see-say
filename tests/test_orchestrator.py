@@ -19,6 +19,7 @@ from brainstormd.orchestrator import (
     _generate_round_1_pool,
     _generate_session_id,
     _outcome_stub,
+    _resolve_session_paths,
     _slugify,
     load_session,
 )
@@ -58,6 +59,35 @@ def test_generate_session_id_uses_today_default():
     assert len(parts) == 2
     date = parts[0]
     assert len(date) == 10 and date[4] == "-" and date[7] == "-"
+
+
+# ---------------------------------------------------------------------------
+# Path resolution
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_session_paths_expands_home():
+    v, b = _resolve_session_paths("~/some-vault", "~/some-wk")
+    assert v.is_absolute()
+    assert b.is_absolute()
+    assert "~" not in str(v)
+    assert "~" not in str(b)
+
+
+def test_resolve_session_paths_makes_relative_absolute(tmp_path: Path, monkeypatch):
+    """Relative paths get rooted at cwd."""
+    monkeypatch.chdir(tmp_path)
+    v, b = _resolve_session_paths("vault", "wk")
+    assert v == (tmp_path / "vault").resolve()
+    assert b == (tmp_path / "wk").resolve()
+
+
+def test_resolve_session_paths_keeps_absolute_absolute(tmp_path: Path):
+    abs_vault = (tmp_path / "vault").resolve()
+    abs_wk = (tmp_path / "wk").resolve()
+    v, b = _resolve_session_paths(abs_vault, abs_wk)
+    assert v == abs_vault
+    assert b == abs_wk
 
 
 # ---------------------------------------------------------------------------
