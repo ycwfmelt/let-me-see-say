@@ -4,7 +4,26 @@
 
 ## 项目一句话
 
-本地多模型脑暴 orchestrator：多个 participant（CLI agent；未来还有 human）在 tmux TUI 里就同一主题层层深入；每 turn 内分两 round（独立 + 收敛），turn 末尾产出 outcome 作为下一 turn 的种子。
+本地多模型脑暴 orchestrator：多个 participant（CLI agent；未来还有 human）在 tmux TUI 里就同一主题层层深入；每 turn 内分两 round（独立 + 收敛），turn 末尾产出 outcome 作为下一 turn 的种子。Web UI 提供 session 管理、实时 pane 查看、outcome 编辑。
+
+## 技术栈
+
+- **Runtime / Package manager**: Bun
+- **Framework**: Next.js (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS v4
+- **Testing**: Vitest (`bun test`)
+- **No CLI**: 所有交互通过 Web UI（`bun dev` 启动）
+
+## 目录结构
+
+- `src/lib/` — 核心逻辑（orchestrator、git-ops、tmux-ops、participant、prompts）
+- `src/app/` — Next.js App Router 页面和 API routes
+- `src/components/` — React 组件
+- `src/hooks/` — React hooks（SSE、session fetching）
+- `__tests__/` — Vitest 测试
+- `docs/` — 设计文档
+- `examples/` — 归档的示例 session
 
 ## 在本仓库工作的硬约束
 
@@ -17,28 +36,7 @@ Agent 用长生 TUI session（`claude`、`codex` 不带 `-p` / `exec`），跨 t
 两条：
 
 1. **Round 1 互盲**：参与者不能看到 siblings round-1 答卷。机制 = worktree-per-participant + 每个 participant 写专属路径 `turn-N/<self>/`。不要让多个 participant 写同一文件
-2. **整 session 不做 mid-session merge**：跨 participant 的可见性由 orchestrator 文件投递控制（`git -C <wt> add && commit` 到对应分支），**不**通过 git merge 跨分支传播。Session 结束 `brainstorm finalize` 时才一次性 merge 归档。详见 ADR-003
-
-### MVP 范围（严格控制）
-
-当前 MVP：
-
-- 2 agent profile（`claude-sonnet` + `codex`），1 session，2 turn
-- 文件协议（**不**做 MCP——MCP 是文件协议跑顺后的机械重构）
-- `--vault` flag（**不**做 `brainstorm init` 全局配置）
-- Filesystem-only（**不**做 SQLite）
-- 只实现 TUIAgent（**不**做 Human，留 stub）
-- **不**做 role 注入（协议槽位留好）
-
-验证三件事：tmux send-keys + task.md 读取链路稳 / git commit 作交卷信号可检测 / outcome 跨 turn 衔接有效。
-
-### MVP 边界（不做但协议留槽位）
-
-下面这些 MVP 不做，但协议层接口已经留好——**未来要做时不要改协议**，直接接进现有结构。详见 `docs/TODO.md`。
-
-- **Human participant**：协议层完整支持（branch / 文件结构 / task.md / status 都对 human 适用）；实现层只 stub。Web UI 来时实现 Human 类
-- **Role / 角色化 prompt**：`Participant.role` 字段 + prompt 模板的 `{{role_section}}` 槽位都已经留好
-- **SQLite 元数据 / MCP / 多 artifact 形态**：协议都不假设这些不存在
+2. **整 session 不做 mid-session merge**：跨 participant 的可见性由 orchestrator 文件投递控制（`git -C <wt> add && commit` 到对应分支），**不**通过 git merge 跨分支传播。Session finalize 时才一次性 merge 归档。详见 ADR-003
 
 ### 设计决策怎么记
 

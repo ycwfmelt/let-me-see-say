@@ -1,18 +1,12 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-dist/
-*.egg-info/
+# Dependencies
+node_modules/
 
-# Virtualenv
-.venv/
-venv/
-env/
-ENV/
+# Next.js
+.next/
+out/
+
+# Build
+dist/
 
 # IDE
 .vscode/
@@ -30,3 +24,7 @@ private-workspaces/
 *.local.toml
 # User-specific agent config (copy agents.toml.example to agents.toml + edit)
 agents.toml
+
+# Env
+.env
+.env.local
