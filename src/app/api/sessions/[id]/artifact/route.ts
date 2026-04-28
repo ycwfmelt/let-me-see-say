@@ -13,11 +13,18 @@ export async function GET(
   const url = new URL(request.url);
   const participant = url.searchParams.get("participant");
   const turn = url.searchParams.get("turn");
-  const round = url.searchParams.get("round") ?? "r1";
+  const file = url.searchParams.get("file") ?? "index.html";
 
   if (!participant || !turn) {
     return NextResponse.json(
       { error: "Missing required query params: participant, turn" },
+      { status: 400 },
+    );
+  }
+
+  if (file.includes("..")) {
+    return NextResponse.json(
+      { error: "Invalid file path" },
       { status: 400 },
     );
   }
@@ -30,12 +37,12 @@ export async function GET(
     );
   }
 
-  const filename = round === "r2" ? "artifact-r2.html" : "artifact.html";
   const artifactPath = path.join(
     session.repoPath,
     `turn-${turn}`,
     participant,
-    filename,
+    "artifact",
+    file,
   );
 
   if (!fs.existsSync(artifactPath)) {
@@ -46,9 +53,18 @@ export async function GET(
   }
 
   const content = fs.readFileSync(artifactPath, "utf-8");
+  const ext = path.extname(file).toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+  };
+  const contentType = mimeTypes[ext] ?? "text/plain; charset=utf-8";
+
   return new Response(content, {
     headers: {
-      "Content-Type": "text/html; charset=utf-8",
+      "Content-Type": contentType,
       "X-Content-Type-Options": "nosniff",
     },
   });

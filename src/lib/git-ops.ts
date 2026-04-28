@@ -218,3 +218,19 @@ export function branchExists(repoPath: string, branch: string): boolean {
   );
   return proc.exitCode === 0;
 }
+
+export function listTree(
+  repoPath: string,
+  ref: string,
+  dirPath: string,
+): string[] {
+  const proc = run(
+    ["ls-tree", "-r", "--name-only", ref, dirPath],
+    repoPath,
+    false,
+  );
+  if (proc.exitCode !== 0) return [];
+  return proc.stdout
+    .split("\n")
+    .filter((line) => line.length > 0);
+}

@@ -284,8 +284,7 @@ export interface SubmissionEntry {
   name: string;
   answer: string;
   refinement: string;
-  artifactR1?: string;
-  artifactR2?: string;
+  hasArtifact?: boolean;
 }
 
 export function buildReviewMaterials(
@@ -307,22 +306,14 @@ export function buildReviewMaterials(
     parts.push("");
     parts.push(sub.answer.trimEnd() || "_(no answer recorded)_");
     parts.push("");
-    if (sub.artifactR1) {
-      parts.push(`### Round 1 — artifact`);
-      parts.push("");
-      parts.push(`<!-- artifact:r1:${sub.name} -->`);
-      parts.push("");
-    }
     parts.push(
       "### Round 2 — refinement after seeing the anonymized pool",
     );
     parts.push("");
     parts.push(sub.refinement.trimEnd() || "_(no refinement recorded)_");
     parts.push("");
-    if (sub.artifactR2) {
-      parts.push(`### Round 2 — artifact`);
-      parts.push("");
-      parts.push(`<!-- artifact:r2:${sub.name} -->`);
+    if (sub.hasArtifact) {
+      parts.push(`<!-- artifact:${sub.name} -->`);
       parts.push("");
     }
     parts.push("---");
@@ -428,18 +419,14 @@ function deliverRound1Pool(
   const answers: [string, string, boolean][] = [];
   for (const p of session.participants) {
     const filePath = `turn-${session.currentTurn}/${p.name}/answer.md`;
-    const artPath = `turn-${session.currentTurn}/${p.name}/artifact.html`;
+    const artDir = `turn-${session.currentTurn}/${p.name}/artifact/`;
     let content: string;
     try {
       content = gitOps.showFile(session.repoPath, p.branch, filePath);
     } catch {
       content = "(no answer found)";
     }
-    let hasArtifact = false;
-    try {
-      gitOps.showFile(session.repoPath, p.branch, artPath);
-      hasArtifact = true;
-    } catch { /* no artifact */ }
+    const hasArtifact = gitOps.listTree(session.repoPath, p.branch, artDir).length > 0;
     answers.push([p.name, content, hasArtifact]);
   }
   const pool = generateRound1Pool(answers, session.currentTurn, rng);
@@ -493,8 +480,7 @@ function draftOutcome(session: Session): void {
   for (const p of session.participants) {
     const ansPath = `${turnDir}/${p.name}/answer.md`;
     const refPath = `${turnDir}/${p.name}/refinement.md`;
-    const artR1Path = `${turnDir}/${p.name}/artifact.html`;
-    const artR2Path = `${turnDir}/${p.name}/artifact-r2.html`;
+    const artDir = `${turnDir}/${p.name}/artifact/`;
     let answer: string;
     try {
       answer = gitOps.showFile(session.repoPath, p.branch, ansPath);
@@ -507,29 +493,22 @@ function draftOutcome(session: Session): void {
     } catch {
       refinement = "";
     }
-    let artifactR1: string | undefined;
-    try {
-      artifactR1 = gitOps.showFile(session.repoPath, p.branch, artR1Path);
-    } catch { /* no artifact */ }
-    let artifactR2: string | undefined;
-    try {
-      artifactR2 = gitOps.showFile(session.repoPath, p.branch, artR2Path);
-    } catch { /* no artifact */ }
 
-    if (artifactR1) {
-      const dstR1 = path.join(session.repoPath, turnDir, p.name, "artifact.html");
-      fs.mkdirSync(path.dirname(dstR1), { recursive: true });
-      fs.writeFileSync(dstR1, artifactR1);
-      artifactFiles.push(`${turnDir}/${p.name}/artifact.html`);
-    }
-    if (artifactR2) {
-      const dstR2 = path.join(session.repoPath, turnDir, p.name, "artifact-r2.html");
-      fs.mkdirSync(path.dirname(dstR2), { recursive: true });
-      fs.writeFileSync(dstR2, artifactR2);
-      artifactFiles.push(`${turnDir}/${p.name}/artifact-r2.html`);
+    const artFiles = gitOps.listTree(session.repoPath, p.branch, artDir);
+    for (const relPath of artFiles) {
+      const fileContent = gitOps.showFile(session.repoPath, p.branch, relPath);
+      const dstPath = path.join(session.repoPath, relPath);
+      fs.mkdirSync(path.dirname(dstPath), { recursive: true });
+      fs.writeFileSync(dstPath, fileContent);
+      artifactFiles.push(relPath);
     }
 
-    submissions.push({ name: p.name, answer, refinement, artifactR1, artifactR2 });
+    submissions.push({
+      name: p.name,
+      answer,
+      refinement,
+      hasArtifact: artFiles.length > 0,
+    });
   }
 
   const content =

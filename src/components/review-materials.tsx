@@ -12,8 +12,7 @@ interface Submission {
   name: string;
   round1: string;
   round2: string;
-  hasArtifactR1: boolean;
-  hasArtifactR2: boolean;
+  hasArtifact: boolean;
 }
 
 function parseReviewBlock(raw: string): Submission[] {
@@ -68,10 +67,9 @@ function parseReviewBlock(raw: string): Submission[] {
       if (round2 === "_(no refinement recorded)_") round2 = "";
     }
 
-    const hasArtifactR1 = chunk.includes(`<!-- artifact:r1:${name} -->`);
-    const hasArtifactR2 = chunk.includes(`<!-- artifact:r2:${name} -->`);
+    const hasArtifact = chunk.includes(`<!-- artifact:${name} -->`);
 
-    submissions.push({ name, round1, round2, hasArtifactR1, hasArtifactR2 });
+    submissions.push({ name, round1, round2, hasArtifact });
   }
   return submissions;
 }
@@ -201,16 +199,12 @@ function SubmissionCard({
             </div>
 
             {/* Artifact preview */}
-            {sessionId && turn != null && (
-              (activeTab === "r1" && submission.hasArtifactR1) ||
-              (activeTab === "r2" && submission.hasArtifactR2)
-            ) && (
+            {submission.hasArtifact && sessionId && turn != null && (
               <div className="p-4 border-t border-gray-700">
                 <ArtifactPreview
                   sessionId={sessionId}
                   participant={submission.name}
                   turn={turn}
-                  round={activeTab === "r1" ? "r1" : "r2"}
                 />
               </div>
             )}
@@ -236,7 +230,6 @@ function RoundViewCard({
   hasArtifact,
   sessionId,
   turn,
-  round,
 }: {
   name: string;
   content: string;
@@ -244,7 +237,6 @@ function RoundViewCard({
   hasArtifact?: boolean;
   sessionId?: string;
   turn?: number;
-  round?: "r1" | "r2";
 }) {
   const [modal, setModal] = useState(false);
 
@@ -269,13 +261,12 @@ function RoundViewCard({
           )}
         </div>
 
-        {hasArtifact && sessionId && turn != null && round && (
+        {hasArtifact && sessionId && turn != null && (
           <div className="p-4 border-t border-gray-700">
             <ArtifactPreview
               sessionId={sessionId}
               participant={name}
               turn={turn}
-              round={round}
             />
           </div>
         )}
@@ -312,10 +303,9 @@ function RoundView({
           name={s.name}
           content={round === "r1" ? s.round1 : s.round2}
           roundLabel={roundLabel}
-          hasArtifact={round === "r1" ? s.hasArtifactR1 : s.hasArtifactR2}
+          hasArtifact={s.hasArtifact}
           sessionId={sessionId}
           turn={turn}
-          round={round}
         />
       ))}
     </div>

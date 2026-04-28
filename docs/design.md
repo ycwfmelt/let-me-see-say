@@ -175,8 +175,8 @@ Vault session 目录（orchestrator 在 vault 里创建）：
 │   ├── <name>/               # 该 participant 的答题目录（其它 participant 看不到）
 │   │   ├── answer.md         # round-1 答卷
 │   │   ├── refinement.md     # round-2 refinement
-│   │   ├── artifact.html     # round-1 HTML 原型（outputMode=md-and-artifact 时）
-│   │   └── artifact-r2.html  # round-2 refined artifact（可选）
+│   │   └── artifact/          # HTML 原型目录（outputMode=md-and-artifact 时）
+│   │       └── index.html    # 入口文件；round-2 原地更新同目录
 │   └── outcome.md            # 上一 turn 完成、人确认后 orchestrator 投递（已 strip review block）
 └── turn-2/<name>/
 ```

@@ -6,7 +6,6 @@ interface Props {
   sessionId: string;
   participant: string;
   turn: number;
-  round: "r1" | "r2";
   label?: string;
 }
 
@@ -14,14 +13,13 @@ export function ArtifactPreview({
   sessionId,
   participant,
   turn,
-  round,
   label,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [showSource, setShowSource] = useState(false);
   const [source, setSource] = useState<string | null>(null);
 
-  const src = `/api/sessions/${sessionId}/artifact?participant=${encodeURIComponent(participant)}&turn=${turn}&round=${round}`;
+  const src = `/api/sessions/${sessionId}/artifact?participant=${encodeURIComponent(participant)}&turn=${turn}`;
 
   const handleViewSource = async () => {
     if (source === null) {
@@ -31,7 +29,7 @@ export function ArtifactPreview({
     setShowSource(!showSource);
   };
 
-  const title = label ?? `${participant} — ${round === "r1" ? "Round 1" : "Round 2"} artifact`;
+  const title = label ?? `${participant} — artifact`;
 
   return (
     <div className="border border-gray-700 rounded-lg overflow-hidden">
