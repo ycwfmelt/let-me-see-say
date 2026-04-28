@@ -12,11 +12,11 @@ export function Markdown({
   return (
     <div
       className={`prose prose-invert prose-sm max-w-none
-        prose-headings:text-gray-200 prose-p:text-gray-300
-        prose-a:text-blue-400 prose-strong:text-gray-200
-        prose-li:text-gray-300 prose-code:text-blue-300
-        prose-code:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
-        prose-pre:bg-gray-900 prose-pre:border prose-pre:border-gray-700
+        prose-headings:text-ctp-subtext1 prose-p:text-ctp-subtext1
+        prose-a:text-ctp-blue prose-strong:text-ctp-subtext1
+        prose-li:text-ctp-subtext1 prose-code:text-ctp-blue
+        prose-code:bg-ctp-base prose-code:px-1 prose-code:py-0.5 prose-code:rounded
+        prose-pre:bg-ctp-mantle prose-pre:border prose-pre:border-ctp-surface1
         ${className ?? ""}`}
     >
       <ReactMarkdown>{content}</ReactMarkdown>

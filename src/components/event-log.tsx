@@ -32,7 +32,7 @@ export function EventLog({ events }: { events: SessionEvent[] }) {
 
   if (filtered.length === 0) {
     return (
-      <div className="text-gray-500 text-sm">No events yet.</div>
+      <div className="text-ctp-overlay0 text-sm">No events yet.</div>
     );
   }
 
@@ -40,14 +40,14 @@ export function EventLog({ events }: { events: SessionEvent[] }) {
     <div className="max-h-48 overflow-y-auto space-y-0.5 font-mono text-xs">
       {filtered.map((event, i) => (
         <div key={i} className="flex gap-2">
-          <span className="text-gray-500 shrink-0">
+          <span className="text-ctp-overlay0 shrink-0">
             {formatTime(event.timestamp)}
           </span>
           <span
             className={
               event.type === "session:error"
-                ? "text-red-400"
-                : "text-gray-300"
+                ? "text-ctp-red"
+                : "text-ctp-subtext1"
             }
           >
             {eventMessage(event)}

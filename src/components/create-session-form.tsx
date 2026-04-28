@@ -73,28 +73,28 @@ export function CreateSessionForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm text-gray-400 mb-1">Topic</label>
+        <label className="block text-sm text-ctp-subtext0 mb-1">Topic</label>
         <textarea
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
           placeholder="What should we brainstorm about?"
           rows={4}
-          className="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 bg-ctp-mantle border border-ctp-surface1 rounded-lg text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ctp-blue"
           required
         />
       </div>
       <div>
-        <label className="block text-sm text-gray-400 mb-1">
+        <label className="block text-sm text-ctp-subtext0 mb-1">
           Vault Path
         </label>
         <DirPicker value={vaultPath} onChange={setVaultPath} />
       </div>
       <div>
-        <label className="block text-sm text-gray-400 mb-2">
+        <label className="block text-sm text-ctp-subtext0 mb-2">
           Participants
         </label>
         {Object.keys(profiles).length === 0 ? (
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-ctp-overlay0">
             No profiles found. Make sure agents.toml exists.
           </p>
         ) : (
@@ -106,8 +106,8 @@ export function CreateSessionForm() {
                 onClick={() => toggleProfile(name)}
                 className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
                   selected.has(name)
-                    ? "border-blue-500 bg-blue-500/20 text-blue-300"
-                    : "border-gray-700 bg-gray-900 text-gray-400 hover:border-gray-500"
+                    ? "border-ctp-blue bg-ctp-blue/20 text-ctp-blue"
+                    : "border-ctp-surface1 bg-ctp-mantle text-ctp-subtext0 hover:border-ctp-overlay0"
                 }`}
               >
                 {name}
@@ -118,7 +118,7 @@ export function CreateSessionForm() {
         )}
       </div>
       <div>
-        <label className="block text-sm text-gray-400 mb-2">
+        <label className="block text-sm text-ctp-subtext0 mb-2">
           Output Format
         </label>
         <div className="flex gap-2">
@@ -127,8 +127,8 @@ export function CreateSessionForm() {
             onClick={() => setOutputMode("md-only")}
             className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
               outputMode === "md-only"
-                ? "border-blue-500 bg-blue-500/20 text-blue-300"
-                : "border-gray-700 bg-gray-900 text-gray-400 hover:border-gray-500"
+                ? "border-ctp-blue bg-ctp-blue/20 text-ctp-blue"
+                : "border-ctp-surface1 bg-ctp-mantle text-ctp-subtext0 hover:border-ctp-overlay0"
             }`}
           >
             Markdown only
@@ -138,8 +138,8 @@ export function CreateSessionForm() {
             onClick={() => setOutputMode("md-and-artifact")}
             className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
               outputMode === "md-and-artifact"
-                ? "border-blue-500 bg-blue-500/20 text-blue-300"
-                : "border-gray-700 bg-gray-900 text-gray-400 hover:border-gray-500"
+                ? "border-ctp-blue bg-ctp-blue/20 text-ctp-blue"
+                : "border-ctp-surface1 bg-ctp-mantle text-ctp-subtext0 hover:border-ctp-overlay0"
             }`}
           >
             Markdown + HTML artifact
@@ -147,12 +147,12 @@ export function CreateSessionForm() {
         </div>
       </div>
       {error && (
-        <div className="text-red-400 text-sm">{error}</div>
+        <div className="text-ctp-red text-sm">{error}</div>
       )}
       <button
         type="submit"
         disabled={creating || !topic || !vaultPath || selected.size === 0}
-        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm rounded-lg transition-colors"
+        className="px-4 py-2 bg-ctp-blue hover:bg-ctp-blue-400 disabled:bg-ctp-surface0 disabled:text-ctp-overlay0 text-ctp-crust text-sm rounded-lg transition-colors"
       >
         {creating ? "Creating..." : "Start Session"}
       </button>

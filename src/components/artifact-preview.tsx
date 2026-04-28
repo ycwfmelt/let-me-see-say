@@ -32,21 +32,21 @@ export function ArtifactPreview({
   const title = label ?? `${participant} — artifact`;
 
   return (
-    <div className="border border-gray-700 rounded-lg overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2 bg-gray-800 border-b border-gray-700">
-        <span className="text-xs font-medium text-gray-300">{title}</span>
+    <div className="border border-ctp-surface1 rounded-lg overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 bg-ctp-base border-b border-ctp-surface1">
+        <span className="text-xs font-medium text-ctp-subtext1">{title}</span>
         <div className="flex gap-1">
           <button
             type="button"
             onClick={handleViewSource}
-            className="px-2 py-0.5 text-xs text-gray-400 hover:text-gray-200 border border-gray-700 rounded hover:bg-gray-800 transition-colors"
+            className="px-2 py-0.5 text-xs text-ctp-subtext0 hover:text-ctp-subtext1 border border-ctp-surface1 rounded hover:bg-ctp-base transition-colors"
           >
             {showSource ? "Preview" : "Source"}
           </button>
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
-            className="px-2 py-0.5 text-xs text-gray-400 hover:text-gray-200 border border-gray-700 rounded hover:bg-gray-800 transition-colors"
+            className="px-2 py-0.5 text-xs text-ctp-subtext0 hover:text-ctp-subtext1 border border-ctp-surface1 rounded hover:bg-ctp-base transition-colors"
           >
             {expanded ? "Collapse" : "Expand"}
           </button>
@@ -54,7 +54,7 @@ export function ArtifactPreview({
       </div>
 
       {showSource && source !== null ? (
-        <pre className={`p-3 bg-gray-900 text-xs text-gray-300 overflow-auto ${expanded ? "max-h-[70vh]" : "max-h-64"}`}>
+        <pre className={`p-3 bg-ctp-mantle text-xs text-ctp-subtext1 overflow-auto ${expanded ? "max-h-[70vh]" : "max-h-64"}`}>
           <code>{source}</code>
         </pre>
       ) : (
