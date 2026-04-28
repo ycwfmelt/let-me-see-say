@@ -102,7 +102,7 @@ export default function SessionPage({
 
   if (loading) {
     return (
-      <main className="max-w-6xl mx-auto px-6 py-12">
+      <main className="mx-auto px-6 py-12">
         <div className="text-ctp-overlay0">Loading session...</div>
       </main>
     );
@@ -110,7 +110,7 @@ export default function SessionPage({
 
   if (error || !session) {
     return (
-      <main className="max-w-6xl mx-auto px-6 py-12">
+      <main className="mx-auto px-6 py-12">
         <div className="text-ctp-red">{error ?? "Session not found"}</div>
         <Link href="/" className="text-ctp-blue hover:underline text-sm mt-4 block">
           Back to dashboard
@@ -130,7 +130,7 @@ export default function SessionPage({
     currentPhase !== "init";
 
   return (
-    <main className="max-w-6xl mx-auto px-6 py-8 space-y-6">
+    <main className="mx-auto px-6 py-8 space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
