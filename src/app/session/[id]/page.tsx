@@ -9,6 +9,7 @@ import { ParticipantPanel } from "@/components/participant-panel";
 import { OutcomeEditor } from "@/components/outcome-editor";
 import { EventLog } from "@/components/event-log";
 import { Markdown } from "@/components/markdown";
+import { AddParticipantButton } from "@/components/add-participant";
 
 const PHASE_LABELS: Record<string, string> = {
   init: "Initializing session...",
@@ -202,6 +203,15 @@ export default function SessionPage({
             paneContent={paneContents[p.name]}
           />
         ))}
+        {isOutcomePending && (
+          <div className="flex items-start">
+            <AddParticipantButton
+              sessionId={id}
+              existingNames={session.participants.map((p) => p.name)}
+              onAdded={refresh}
+            />
+          </div>
+        )}
       </div>
 
       {/* Outcome editor (when outcome-pending) */}

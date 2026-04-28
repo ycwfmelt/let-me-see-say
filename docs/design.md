@@ -102,6 +102,7 @@ Send-keys 只是 wake signal，内容在文件——避免 tmux 转义 / 引号 
 - **Participant 抽象 + task.md 唤醒协议**（ADR-005）：agent + human 协议层等价
 - **Outcome.md 嵌入答卷供人 review，投递时 strip**（ADR-006）：同一份 outcome.md 在 vault 里给人看时带答卷，给下一 turn agent 看时只剩决定
 - **Artifact 支持**（ADR-007）：session 级 `outputMode` 控制 participant 是否产出 HTML 原型（`artifact.html`）；Web UI 用 sandboxed iframe 预览
+- **Turn 边界加人**（ADR-009）：`outcome-pending` 状态下可通过 Web UI 向 session 添加新 participant；新 participant 的 worktree 从 main 创建并清理（strip outcomes + 删除其他 participant 的 artifact 目录），完成 boot 后参与后续 turn
 
 ## 仓库 / vault 布局
 
@@ -267,8 +268,9 @@ Finalize 后 vault main 上能看到所有 participant 的 raw `answer.md` / `re
 - Filesystem-only（无 SQLite）
 - 只实现 TUIAgent（无 Human，留 stub）
 - 无 role 注入（协议槽位留好）
+- Turn 边界加人：`outcome-pending` 状态下可通过 Web UI 添加新 agent participant
 
-技术栈：TypeScript + Bun + Next.js (App Router) + Tailwind CSS + Vitest（86 个测试）
+技术栈：TypeScript + Bun + Next.js (App Router) + Tailwind CSS + Vitest（93 个测试）
 
 验证过的三件事：
 1. tmux send-keys + task.md 读取链路稳

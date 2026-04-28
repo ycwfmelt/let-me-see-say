@@ -16,9 +16,12 @@ import {
   loadSession,
   PHASE_OUTCOME_PENDING,
   PHASE_ROUND_1_DONE,
+  PHASE_INIT,
   _draftOutcome,
   _deliverOutcomeToParticipants,
   _resolveSessionPaths,
+  _cleanWorktreeForLateJoiner,
+  addParticipantToSession,
   advanceToNextTurn,
   finalize,
 } from "@/lib/orchestrator";
@@ -742,5 +745,184 @@ describe("advance commits dirty outcome", () => {
       "utf-8",
     );
     expect(delivered.trimEnd()).toBe("USER-CONFIRMED-V2");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// cleanWorktreeForLateJoiner
+// ---------------------------------------------------------------------------
+
+describe("cleanWorktreeForLateJoiner", () => {
+  it("strips review materials from outcome.md", () => {
+    const repo = makeRepo();
+    fs.writeFileSync(path.join(repo, "00_topic.md"), "topic");
+    gitOps.commit(repo, "init");
+
+    // Simulate main having an unstripped outcome
+    fs.mkdirSync(path.join(repo, "turn-1"), { recursive: true });
+    fs.writeFileSync(
+      path.join(repo, "turn-1", "outcome.md"),
+      "# Decision\nKeep it simple\n\n" +
+        REVIEW_BEGIN_MARKER +
+        "\n## alice\nraw answer\n" +
+        REVIEW_END_MARKER +
+        "\n",
+    );
+    gitOps.commit(repo, "draft outcome");
+
+    // Create a worktree branching from main (simulating late joiner)
+    const wt = path.join(tmpDir, "wt-new");
+    gitOps.addWorktree(repo, wt, "participant/s/newcomer");
+
+    _cleanWorktreeForLateJoiner(wt, 1, ["alice"]);
+
+    const content = fs.readFileSync(
+      path.join(wt, "turn-1", "outcome.md"),
+      "utf-8",
+    );
+    expect(content).toContain("Keep it simple");
+    expect(content).not.toContain(REVIEW_BEGIN_MARKER);
+    expect(content).not.toContain("raw answer");
+
+    // Should have committed the cleanup
+    const subjects = gitOps.logSubjects(repo, "participant/s/newcomer");
+    expect(
+      subjects.some((s) => s.includes("clean worktree for late joiner")),
+    ).toBe(true);
+  });
+
+  it("removes other participants' artifact directories", () => {
+    const repo = makeRepo();
+    fs.writeFileSync(path.join(repo, "00_topic.md"), "topic");
+    gitOps.commit(repo, "init");
+
+    // Simulate main having artifact dirs from draftOutcome
+    fs.mkdirSync(path.join(repo, "turn-1", "alice", "artifact"), {
+      recursive: true,
+    });
+    fs.writeFileSync(
+      path.join(repo, "turn-1", "alice", "artifact", "index.html"),
+      "<html>alice prototype</html>",
+    );
+    fs.mkdirSync(path.join(repo, "turn-1"), { recursive: true });
+    fs.writeFileSync(
+      path.join(repo, "turn-1", "outcome.md"),
+      "# Decision\nFoo\n",
+    );
+    gitOps.commit(repo, "draft outcome with artifacts");
+
+    const wt = path.join(tmpDir, "wt-new");
+    gitOps.addWorktree(repo, wt, "participant/s/newcomer");
+
+    // Verify artifact exists before cleanup
+    expect(
+      fs.existsSync(
+        path.join(wt, "turn-1", "alice", "artifact", "index.html"),
+      ),
+    ).toBe(true);
+
+    _cleanWorktreeForLateJoiner(wt, 1, ["alice"]);
+
+    // Artifact directory should be gone
+    expect(fs.existsSync(path.join(wt, "turn-1", "alice"))).toBe(false);
+    // Outcome should still be there (no review materials to strip)
+    expect(
+      fs.readFileSync(path.join(wt, "turn-1", "outcome.md"), "utf-8"),
+    ).toContain("Foo");
+  });
+
+  it("handles multiple turns", () => {
+    const repo = makeRepo();
+    fs.writeFileSync(path.join(repo, "00_topic.md"), "topic");
+    gitOps.commit(repo, "init");
+
+    for (const t of [1, 2]) {
+      fs.mkdirSync(path.join(repo, `turn-${t}`), { recursive: true });
+      fs.writeFileSync(
+        path.join(repo, `turn-${t}`, "outcome.md"),
+        `# Turn ${t}\n\n` +
+          REVIEW_BEGIN_MARKER +
+          `\nraw data ${t}\n` +
+          REVIEW_END_MARKER +
+          "\n",
+      );
+    }
+    gitOps.commit(repo, "outcomes");
+
+    const wt = path.join(tmpDir, "wt-new");
+    gitOps.addWorktree(repo, wt, "participant/s/newcomer");
+
+    _cleanWorktreeForLateJoiner(wt, 2, []);
+
+    for (const t of [1, 2]) {
+      const content = fs.readFileSync(
+        path.join(wt, `turn-${t}`, "outcome.md"),
+        "utf-8",
+      );
+      expect(content).toContain(`Turn ${t}`);
+      expect(content).not.toContain(REVIEW_BEGIN_MARKER);
+      expect(content).not.toContain(`raw data ${t}`);
+    }
+  });
+
+  it("no-op when worktree is already clean", () => {
+    const repo = makeRepo();
+    fs.writeFileSync(path.join(repo, "00_topic.md"), "topic");
+    gitOps.commit(repo, "init");
+
+    const wt = path.join(tmpDir, "wt-new");
+    gitOps.addWorktree(repo, wt, "participant/s/newcomer");
+
+    // No turn directories — should not throw or create commits
+    const subjectsBefore = gitOps.logSubjects(repo, "participant/s/newcomer");
+    _cleanWorktreeForLateJoiner(wt, 1, []);
+    const subjectsAfter = gitOps.logSubjects(repo, "participant/s/newcomer");
+    expect(subjectsAfter.length).toBe(subjectsBefore.length);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// addParticipantToSession
+// ---------------------------------------------------------------------------
+
+describe("addParticipantToSession", () => {
+  const testProfile: AgentProfile = {
+    name: "newcomer",
+    cli: "bash",
+    flags: [],
+    env: {},
+    postStartKeys: [],
+    postStartDelay: 0,
+  };
+
+  it("rejects wrong phase", async () => {
+    const session = makeTestSession();
+    session.currentPhase = PHASE_ROUND_1_DONE;
+    await expect(
+      addParticipantToSession(session, {
+        profileName: "newcomer",
+        agentProfiles: { newcomer: testProfile },
+      }),
+    ).rejects.toThrow(/phase/);
+  });
+
+  it("rejects duplicate name", async () => {
+    const session = makeTestSession();
+    await expect(
+      addParticipantToSession(session, {
+        profileName: "claude-sonnet",
+        agentProfiles: { "claude-sonnet": testProfile },
+      }),
+    ).rejects.toThrow(/already exists/);
+  });
+
+  it("rejects unknown profile", async () => {
+    const session = makeTestSession();
+    await expect(
+      addParticipantToSession(session, {
+        profileName: "nonexistent",
+        agentProfiles: {},
+      }),
+    ).rejects.toThrow(/Unknown agent profile/);
   });
 });

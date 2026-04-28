@@ -213,6 +213,49 @@ export class SessionStore {
     return result;
   }
 
+  addParticipant(sessionId: string, profileName: string): void {
+    const session = this.getSession(sessionId);
+    if (!session) throw new Error(`Session ${sessionId} not found`);
+
+    const profiles = loadAgentProfiles(this.agentsTomlPath);
+
+    const controller = new AbortController();
+    this.abortControllers.set(sessionId, controller);
+
+    this.emit({
+      type: "participant:added",
+      sessionId,
+      timestamp: Date.now(),
+      participantName: profileName,
+      message: `Adding participant: ${profileName}`,
+    });
+
+    orchestrator
+      .addParticipantToSession(
+        session,
+        { profileName, agentProfiles: profiles },
+        controller.signal,
+      )
+      .then(() => {
+        this.emit({
+          type: "session:phase-changed",
+          sessionId,
+          timestamp: Date.now(),
+          phase: session.currentPhase,
+          turn: session.currentTurn,
+        });
+        this.startPaneCapture(sessionId);
+      })
+      .catch((err) => {
+        this.emit({
+          type: "session:error",
+          sessionId,
+          timestamp: Date.now(),
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+  }
+
   updateOutcome(sessionId: string, content: string): void {
     const session = this.getSession(sessionId);
     if (!session) throw new Error(`Session ${sessionId} not found`);

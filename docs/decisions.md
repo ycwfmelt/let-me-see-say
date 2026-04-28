@@ -268,3 +268,38 @@ env = { ANTHROPIC_OAUTH_TOKEN = "..." }
 - Python 文件（brainstormd/、tests/、pyproject.toml、uv.lock、.python-version）已删除
 
 ---
+
+## ADR-009 · 支持在 turn 边界加入新 participant（2026-04-28）
+
+**状态：** Accepted
+
+**决策：** 允许在 session 处于 `outcome-pending` 状态时（即人编辑完 outcome、尚未 advance 到下一 turn）向 session 添加新 participant。新 participant 从下一 turn 开始正式参与 round-1 / round-2。
+
+具体流程：
+1. 从 main 创建 worktree + branch（`participant/<session>/<name>`）
+2. 清理 worktree：strip 所有 `turn-*/outcome.md` 的 review materials，删除 main 上其他 participant 的 artifact 目录
+3. 启动 TUI agent，完成 boot handshake
+4. 加入 `session.participants` 数组，保存 manifest
+5. 后续 advance 时，新 participant 与原有 participant 一起接收 stripped outcome 并进入新 turn
+
+**上下文：** 用户希望在 brainstorm 进行中根据讨论走向加入新 agent。例如前两 turn 用两个 model 讨论，第三 turn 加入第三个 model 以引入新视角。
+
+**理由：**
+- Turn 边界是唯一安全的加入点：outcome 已确认、没有进行中的 round 隔离需要维护。Mid-round 加入会破坏 round-1 互盲不变量（新 participant 无法公平参与已进行的 round）
+- 新 participant 的 worktree 从 main 分支创建。Main 上有带 review materials 的 outcome + draftOutcome 拷贝的 artifact 目录。这些必须清理，否则新 participant 看到了原始答卷（通过 review block）和其他 participant 的 artifact——违反隔离原则
+- Boot handshake 确保 TUI agent 已启动并理解协议后才参与；与 session 创建时的 boot 流程一致
+- 现有 `advanceToNextTurn` 遍历 `session.participants` 发送任务和收集答卷——新 participant 加入后自然被包含，无需修改 phase runner
+
+**考虑过的替代方案：**
+- Mid-round 加入（round-1 或 round-2 进行中）→ 破坏 round 隔离不变量；需要重新生成 pool 或跳过当前 round，复杂且脆弱
+- 从空白分支创建 worktree（不基于 main）→ 新 participant 缺少 topic、rules、prior outcomes，需要逐一投递，工作量大且容易遗漏
+- 不清理 main 上的 review materials → 新 participant 能读到上一轮所有人的 raw 答卷，违反 ADR-006 "投递时 strip" 的精神
+
+**结论 / 后续：**
+- `orchestrator.addParticipantToSession()` 实现核心逻辑；`cleanWorktreeForLateJoiner()` 处理 worktree 清理
+- API: `POST /api/sessions/[id]/participants`，body `{ profileName }`
+- Web UI: session 详情页在 `outcome-pending` 状态下显示 "+ Add Participant" 按钮
+- SSE 事件 `participant:added` 通知前端
+- 7 个新测试覆盖：cleanWorktreeForLateJoiner（strip outcomes、remove artifacts、multi-turn、no-op）+ addParticipantToSession（phase 校验、重名校验、未知 profile 校验）
+
+---
