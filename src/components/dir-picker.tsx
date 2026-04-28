@@ -58,28 +58,28 @@ export function DirPicker({ value, onChange }: Props) {
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="~/Obsidian/MyVault"
-          className="flex-1 px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 px-3 py-2 bg-ctp-mantle border border-ctp-surface1 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ctp-blue"
         />
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 hover:bg-gray-700 transition-colors shrink-0"
+          className="px-3 py-2 bg-ctp-crust border border-ctp-surface1 rounded-lg text-sm text-ctp-subtext1 hover:bg-ctp-surface0 transition-colors shrink-0"
         >
           Browse
         </button>
       </div>
 
       {open && (
-        <div className="mt-2 border border-gray-700 rounded-lg bg-gray-900 overflow-hidden">
+        <div className="mt-2 border border-ctp-surface1 rounded-lg bg-ctp-mantle overflow-hidden">
           {/* Current path + select */}
-          <div className="flex items-center justify-between px-3 py-2 bg-gray-800 border-b border-gray-700">
-            <span className="text-xs font-mono text-gray-300 truncate flex-1">
+          <div className="flex items-center justify-between px-3 py-2 bg-ctp-crust border-b border-ctp-surface1">
+            <span className="text-xs font-mono text-ctp-subtext1 truncate flex-1">
               {current}
             </span>
             <button
               type="button"
               onClick={select}
-              className="ml-2 px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded transition-colors shrink-0"
+              className="ml-2 px-3 py-1 bg-ctp-blue hover:bg-ctp-blue-400 text-ctp-base text-xs rounded transition-colors shrink-0"
             >
               Select
             </button>
@@ -92,16 +92,16 @@ export function DirPicker({ value, onChange }: Props) {
               <button
                 type="button"
                 onClick={() => browse(parent)}
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-800 transition-colors text-gray-400"
+                className="w-full text-left px-3 py-1.5 text-sm hover:bg-ctp-crust transition-colors text-ctp-subtext0"
               >
                 ..
               </button>
             )}
 
             {loading ? (
-              <div className="px-3 py-2 text-xs text-gray-500">Loading...</div>
+              <div className="px-3 py-2 text-xs text-ctp-overlay0">Loading...</div>
             ) : entries.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-gray-500">
+              <div className="px-3 py-2 text-xs text-ctp-overlay0">
                 No subdirectories
               </div>
             ) : (
@@ -110,7 +110,7 @@ export function DirPicker({ value, onChange }: Props) {
                   key={entry.path}
                   type="button"
                   onClick={() => browse(entry.path)}
-                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-800 transition-colors text-gray-300"
+                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-ctp-crust transition-colors text-ctp-subtext1"
                 >
                   {entry.name}/
                 </button>

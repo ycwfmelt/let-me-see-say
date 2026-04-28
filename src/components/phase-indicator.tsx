@@ -12,7 +12,7 @@ const TERMINAL = ["finalized", "cancelled"] as const;
 
 export function PhaseIndicator({ phase }: { phase: string }) {
   if (TERMINAL.some((t) => t === phase)) {
-    const color = phase === "finalized" ? "text-green-400" : "text-red-400";
+    const color = phase === "finalized" ? "text-ctp-green" : "text-ctp-red";
     return (
       <span className={`text-sm font-medium ${color}`}>
         {phase.toUpperCase()}
@@ -25,9 +25,9 @@ export function PhaseIndicator({ phase }: { phase: string }) {
   return (
     <div className="flex items-center gap-1">
       {PHASES.map((p, i) => {
-        let color = "bg-gray-700";
-        if (i < currentIdx) color = "bg-blue-600";
-        if (i === currentIdx) color = "bg-blue-400 ring-2 ring-blue-300";
+        let color = "bg-ctp-surface1";
+        if (i < currentIdx) color = "bg-ctp-blue";
+        if (i === currentIdx) color = "bg-ctp-blue-400 ring-2 ring-ctp-blue";
         return (
           <div key={p.key} className="flex items-center gap-1">
             <div
@@ -35,12 +35,12 @@ export function PhaseIndicator({ phase }: { phase: string }) {
               title={p.label}
             />
             {i < PHASES.length - 1 && (
-              <div className="w-1 h-0.5 bg-gray-600" />
+              <div className="w-1 h-0.5 bg-ctp-surface2" />
             )}
           </div>
         );
       })}
-      <span className="ml-2 text-xs text-gray-400">
+      <span className="ml-2 text-xs text-ctp-subtext0">
         {PHASES[currentIdx]?.label ?? phase}
       </span>
     </div>

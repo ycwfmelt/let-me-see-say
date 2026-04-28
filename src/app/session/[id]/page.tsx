@@ -103,7 +103,7 @@ export default function SessionPage({
   if (loading) {
     return (
       <main className="max-w-6xl mx-auto px-6 py-12">
-        <div className="text-gray-500">Loading session...</div>
+        <div className="text-ctp-overlay0">Loading session...</div>
       </main>
     );
   }
@@ -111,8 +111,8 @@ export default function SessionPage({
   if (error || !session) {
     return (
       <main className="max-w-6xl mx-auto px-6 py-12">
-        <div className="text-red-400">{error ?? "Session not found"}</div>
-        <Link href="/" className="text-blue-400 hover:underline text-sm mt-4 block">
+        <div className="text-ctp-red">{error ?? "Session not found"}</div>
+        <Link href="/" className="text-ctp-blue hover:underline text-sm mt-4 block">
           Back to dashboard
         </Link>
       </main>
@@ -136,11 +136,11 @@ export default function SessionPage({
         <div className="flex-1 min-w-0">
           <Link
             href="/"
-            className="text-xs text-gray-500 hover:text-gray-300 mb-1 block"
+            className="text-xs text-ctp-overlay0 hover:text-ctp-subtext1 mb-1 block"
           >
             &larr; Dashboard
           </Link>
-          <div className="text-xs text-gray-500 font-mono mt-1 mb-2">
+          <div className="text-xs text-ctp-overlay0 font-mono mt-1 mb-2">
             {session.sessionId}
           </div>
         </div>
@@ -149,14 +149,14 @@ export default function SessionPage({
             <>
               <button
                 onClick={handleCancel}
-                className="px-3 py-1.5 text-sm border border-red-800 text-red-400 hover:bg-red-900/30 rounded-md transition-colors"
+                className="px-3 py-1.5 text-sm border border-ctp-red/50 text-ctp-red hover:bg-ctp-red/15 rounded-md transition-colors"
               >
                 Cancel
               </button>
               {canResume && (
                 <button
                   onClick={handleResume}
-                  className="px-3 py-1.5 text-sm bg-green-700 hover:bg-green-600 text-white rounded-md transition-colors"
+                  className="px-3 py-1.5 text-sm bg-ctp-green/80 hover:bg-ctp-green text-ctp-base rounded-md transition-colors"
                 >
                   Resume
                 </button>
@@ -164,7 +164,7 @@ export default function SessionPage({
               {isOutcomePending && (
                 <button
                   onClick={handleFinalize}
-                  className="px-3 py-1.5 text-sm border border-gray-600 text-gray-300 hover:bg-gray-800 rounded-md transition-colors"
+                  className="px-3 py-1.5 text-sm border border-ctp-surface2 text-ctp-subtext1 hover:bg-ctp-crust rounded-md transition-colors"
                 >
                   Finalize
                 </button>
@@ -175,19 +175,19 @@ export default function SessionPage({
       </div>
 
       {/* Topic */}
-      <div className="p-4 rounded-lg border border-gray-800 bg-gray-900/50 max-h-64 overflow-y-auto">
+      <div className="p-4 rounded-lg border border-ctp-surface0 bg-ctp-mantle/50 max-h-64 overflow-y-auto">
         <Markdown content={session.topic} />
       </div>
 
       {/* Status bar */}
-      <div className="flex items-center gap-4 p-3 rounded-lg bg-gray-900/50 border border-gray-800">
+      <div className="flex items-center gap-4 p-3 rounded-lg bg-ctp-mantle/50 border border-ctp-surface0">
         <PhaseIndicator phase={currentPhase} />
-        <span className="text-sm text-gray-400">Turn {currentTurn}</span>
-        <span className="text-sm text-gray-500 flex-1">
+        <span className="text-sm text-ctp-subtext0">Turn {currentTurn}</span>
+        <span className="text-sm text-ctp-overlay0 flex-1">
           {PHASE_LABELS[currentPhase] ?? currentPhase}
         </span>
         {effectiveRunning && (
-          <span className="text-xs text-blue-400 animate-pulse">Running...</span>
+          <span className="text-xs text-ctp-blue animate-pulse">Running...</span>
         )}
       </div>
 
@@ -206,13 +206,13 @@ export default function SessionPage({
 
       {/* Outcome editor (when outcome-pending) */}
       {isOutcomePending && (
-        <div className="p-4 rounded-lg border border-gray-800 bg-gray-900/50">
+        <div className="p-4 rounded-lg border border-ctp-surface0 bg-ctp-mantle/50">
           <OutcomeEditor sessionId={id} onAdvance={handleAdvance} />
         </div>
       )}
 
       {/* Event log */}
-      <div className="p-4 rounded-lg border border-gray-800 bg-gray-900/50">
+      <div className="p-4 rounded-lg border border-ctp-surface0 bg-ctp-mantle/50">
         <h3 className="font-semibold text-sm mb-2">Event Log</h3>
         <EventLog events={events} />
       </div>

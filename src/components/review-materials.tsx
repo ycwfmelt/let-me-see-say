@@ -93,17 +93,17 @@ function ContentModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-[85vw] h-[80vh] flex flex-col rounded-xl border border-gray-700 bg-gray-950 shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3 bg-gray-900 border-b border-gray-700">
-          <span className="font-medium text-sm text-gray-200">{title}</span>
+      <div className="w-[85vw] h-[80vh] flex flex-col rounded-xl border border-ctp-surface1 bg-ctp-base shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3 bg-ctp-mantle border-b border-ctp-surface1">
+          <span className="font-medium text-sm text-ctp-subtext1">{title}</span>
           <button
             onClick={onClose}
-            className="px-2 py-0.5 text-xs text-gray-400 hover:text-gray-200 border border-gray-700 rounded hover:bg-gray-800 transition-colors"
+            className="px-2 py-0.5 text-xs text-ctp-subtext0 hover:text-ctp-subtext1 border border-ctp-surface1 rounded hover:bg-ctp-crust transition-colors"
           >
             ESC
           </button>
@@ -144,16 +144,16 @@ function SubmissionCard({
 
   return (
     <>
-      <div className="border border-gray-700 rounded-lg overflow-hidden group">
+      <div className="border border-ctp-surface1 rounded-lg overflow-hidden group">
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center justify-between px-4 py-2.5 bg-gray-800 hover:bg-gray-800/80 transition-colors"
+          className="w-full flex items-center justify-between px-4 py-2.5 bg-ctp-crust hover:bg-ctp-crust/80 transition-colors"
         >
-          <span className="font-medium text-sm text-gray-200">
+          <span className="font-medium text-sm text-ctp-subtext1">
             {submission.name}
           </span>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-ctp-overlay0">
             {collapsed ? "▸" : "▾"}
           </span>
         </button>
@@ -161,14 +161,14 @@ function SubmissionCard({
         {!collapsed && (
           <div>
             {/* Round tabs + expand */}
-            <div className="flex border-b border-gray-700">
+            <div className="flex border-b border-ctp-surface1">
               <button
                 type="button"
                 onClick={() => setActiveTab("r1")}
                 className={`flex-1 px-3 py-1.5 text-xs transition-colors ${
                   activeTab === "r1"
-                    ? "text-blue-300 border-b-2 border-blue-400 bg-gray-900"
-                    : "text-gray-500 hover:text-gray-300"
+                    ? "text-ctp-blue border-b-2 border-ctp-blue bg-ctp-mantle"
+                    : "text-ctp-overlay0 hover:text-ctp-subtext1"
                 }`}
               >
                 Round 1 — Independent
@@ -178,8 +178,8 @@ function SubmissionCard({
                 onClick={() => setActiveTab("r2")}
                 className={`flex-1 px-3 py-1.5 text-xs transition-colors ${
                   activeTab === "r2"
-                    ? "text-blue-300 border-b-2 border-blue-400 bg-gray-900"
-                    : "text-gray-500 hover:text-gray-300"
+                    ? "text-ctp-blue border-b-2 border-ctp-blue bg-ctp-mantle"
+                    : "text-ctp-overlay0 hover:text-ctp-subtext1"
                 }`}
               >
                 Round 2 — Refined
@@ -191,24 +191,24 @@ function SubmissionCard({
                     ? onExpand(index!, activeTab)
                     : setModal(true)
                 }
-                className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 border-l border-gray-700 transition-colors"
+                className="px-3 py-1.5 text-xs text-ctp-overlay0 hover:text-ctp-subtext1 border-l border-ctp-surface1 transition-colors"
               >
                 Expand
               </button>
             </div>
 
             {/* Content */}
-            <div className="p-4 max-h-80 overflow-y-auto bg-gray-900/30">
+            <div className="p-4 max-h-80 overflow-y-auto bg-ctp-mantle/30">
               {content ? (
                 <Markdown content={content} />
               ) : (
-                <p className="text-gray-500 text-sm italic">No submission</p>
+                <p className="text-ctp-overlay0 text-sm italic">No submission</p>
               )}
             </div>
 
             {/* Artifact preview */}
             {submission.hasArtifact && sessionId && turn != null && (
-              <div className="p-4 border-t border-gray-700">
+              <div className="p-4 border-t border-ctp-surface1">
                 <ArtifactPreview
                   sessionId={sessionId}
                   participant={submission.name}
@@ -256,9 +256,9 @@ function RoundViewCard({
 
   return (
     <>
-      <div className="border border-gray-700 rounded-lg overflow-hidden group">
-        <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
-          <span className="font-medium text-sm text-gray-200">{name}</span>
+      <div className="border border-ctp-surface1 rounded-lg overflow-hidden group">
+        <div className="flex items-center justify-between px-4 py-2 bg-ctp-crust border-b border-ctp-surface1">
+          <span className="font-medium text-sm text-ctp-subtext1">{name}</span>
           <button
             type="button"
             onClick={() =>
@@ -266,21 +266,21 @@ function RoundViewCard({
                 ? onExpand(index!, round!)
                 : setModal(true)
             }
-            className="text-xs text-gray-500 hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="text-xs text-ctp-overlay0 hover:text-ctp-subtext1 opacity-0 group-hover:opacity-100 transition-opacity"
           >
             Expand
           </button>
         </div>
-        <div className="p-4 max-h-80 overflow-y-auto bg-gray-900/30">
+        <div className="p-4 max-h-80 overflow-y-auto bg-ctp-mantle/30">
           {content ? (
             <Markdown content={content} />
           ) : (
-            <p className="text-gray-500 text-sm italic">No submission</p>
+            <p className="text-ctp-overlay0 text-sm italic">No submission</p>
           )}
         </div>
 
         {hasArtifact && sessionId && turn != null && (
-          <div className="p-4 border-t border-gray-700">
+          <div className="p-4 border-t border-ctp-surface1">
             <ArtifactPreview
               sessionId={sessionId}
               participant={name}
@@ -355,30 +355,30 @@ export function ReviewMaterials({
   if (submissions.length === 0) return null;
 
   return (
-    <div className="border border-gray-700 rounded-lg overflow-hidden">
+    <div className="border border-ctp-surface1 rounded-lg overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-gray-800">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-ctp-crust">
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-2 text-sm font-medium text-gray-300 hover:text-gray-100 transition-colors"
+          className="flex items-center gap-2 text-sm font-medium text-ctp-subtext1 hover:text-ctp-text transition-colors"
         >
-          <span className="text-xs text-gray-500">{open ? "▾" : "▸"}</span>
+          <span className="text-xs text-ctp-overlay0">{open ? "▾" : "▸"}</span>
           Participant Submissions
-          <span className="text-xs text-gray-500 font-normal">
+          <span className="text-xs text-ctp-overlay0 font-normal">
             ({submissions.length} participants)
           </span>
         </button>
 
         {open && (
-          <div className="flex gap-1 bg-gray-900 rounded-md p-0.5">
+          <div className="flex gap-1 bg-ctp-mantle rounded-md p-0.5">
             <button
               type="button"
               onClick={() => setViewMode("participants")}
               className={`px-2.5 py-1 text-xs rounded transition-colors ${
                 viewMode === "participants"
-                  ? "bg-gray-700 text-gray-200"
-                  : "text-gray-500 hover:text-gray-300"
+                  ? "bg-ctp-surface0 text-ctp-subtext1"
+                  : "text-ctp-overlay0 hover:text-ctp-subtext1"
               }`}
             >
               By Participant
@@ -388,8 +388,8 @@ export function ReviewMaterials({
               onClick={() => setViewMode("rounds")}
               className={`px-2.5 py-1 text-xs rounded transition-colors ${
                 viewMode === "rounds"
-                  ? "bg-gray-700 text-gray-200"
-                  : "text-gray-500 hover:text-gray-300"
+                  ? "bg-ctp-surface0 text-ctp-subtext1"
+                  : "text-ctp-overlay0 hover:text-ctp-subtext1"
               }`}
             >
               By Round
@@ -421,8 +421,8 @@ export function ReviewMaterials({
                   onClick={() => setRoundTab("r1")}
                   className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
                     roundTab === "r1"
-                      ? "border-blue-500 bg-blue-500/20 text-blue-300"
-                      : "border-gray-700 text-gray-400 hover:border-gray-500"
+                      ? "border-ctp-blue bg-ctp-blue/20 text-ctp-blue"
+                      : "border-ctp-surface1 text-ctp-subtext0 hover:border-ctp-overlay0"
                   }`}
                 >
                   Round 1 — Independent Answers
@@ -432,8 +432,8 @@ export function ReviewMaterials({
                   onClick={() => setRoundTab("r2")}
                   className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
                     roundTab === "r2"
-                      ? "border-blue-500 bg-blue-500/20 text-blue-300"
-                      : "border-gray-700 text-gray-400 hover:border-gray-500"
+                      ? "border-ctp-blue bg-ctp-blue/20 text-ctp-blue"
+                      : "border-ctp-surface1 text-ctp-subtext0 hover:border-ctp-overlay0"
                   }`}
                 >
                   Round 2 — Refined Views
