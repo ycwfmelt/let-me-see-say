@@ -63,6 +63,7 @@ export class SessionStore {
     topic: string;
     vaultPath: string;
     participants: string[];
+    outputMode?: "md-only" | "md-and-artifact";
   }): string {
     const profiles = loadAgentProfiles(this.agentsTomlPath);
     const sessionId = orchestrator.generateSessionId(opts.topic);
@@ -84,6 +85,7 @@ export class SessionStore {
       agentProfiles: profiles,
       baseWorkspaces: this.workspacesDir,
       sessionId,
+      outputMode: opts.outputMode,
     };
 
     orchestrator
@@ -144,7 +146,7 @@ export class SessionStore {
     this.startPaneCapture(sessionId);
   }
 
-  advanceSession(sessionId: string): void {
+  advanceSession(sessionId: string, outputMode?: "md-only" | "md-and-artifact"): void {
     const session = this.getSession(sessionId);
     if (!session) throw new Error(`Session ${sessionId} not found`);
 
@@ -152,7 +154,7 @@ export class SessionStore {
     this.abortControllers.set(sessionId, controller);
 
     orchestrator
-      .advanceToNextTurn(session, controller.signal)
+      .advanceToNextTurn(session, controller.signal, outputMode)
       .then((s) => {
         this.emit({
           type: "session:phase-changed",

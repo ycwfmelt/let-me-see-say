@@ -3,9 +3,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ReviewMaterials } from "./review-materials";
 
+type OutputMode = "md-only" | "md-and-artifact";
+
 interface Props {
   sessionId: string;
-  onAdvance: () => void;
+  onAdvance: (outputMode: OutputMode) => void;
 }
 
 type OutcomeKind = "decision" | "open-questions" | "summary";
@@ -112,6 +114,7 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
   const [loaded, setLoaded] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
   const [rawContent, setRawContent] = useState("");
+  const [nextOutputMode, setNextOutputMode] = useState<OutputMode>("md-only");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -178,7 +181,7 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
   const handleAdvance = async () => {
     const content = serializeOutcome(turn, kind, decision, notes, reviewBlock);
     await save(content);
-    onAdvance();
+    onAdvance(nextOutputMode);
   };
 
   if (!loaded) {
@@ -276,7 +279,44 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
           </div>
 
           {/* Review materials (read-only) */}
-          {reviewBlock && <ReviewMaterials content={reviewBlock} />}
+          {reviewBlock && (
+            <ReviewMaterials
+              content={reviewBlock}
+              sessionId={sessionId}
+              turn={turn}
+            />
+          )}
+
+          {/* Next turn output mode */}
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">
+              Next turn output format
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setNextOutputMode("md-only")}
+                className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                  nextOutputMode === "md-only"
+                    ? "border-blue-500 bg-blue-500/20 text-blue-300"
+                    : "border-gray-700 bg-gray-900 text-gray-400 hover:border-gray-500"
+                }`}
+              >
+                Markdown only
+              </button>
+              <button
+                type="button"
+                onClick={() => setNextOutputMode("md-and-artifact")}
+                className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                  nextOutputMode === "md-and-artifact"
+                    ? "border-blue-500 bg-blue-500/20 text-blue-300"
+                    : "border-gray-700 bg-gray-900 text-gray-400 hover:border-gray-500"
+                }`}
+              >
+                Markdown + HTML artifact
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

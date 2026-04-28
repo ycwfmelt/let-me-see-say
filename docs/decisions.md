@@ -203,31 +203,35 @@ env = { ANTHROPIC_OAUTH_TOKEN = "..." }
 
 **决策：**
 1. 新增 session 级 `outputMode` 字段（`"md-only"` | `"md-and-artifact"`），控制本 turn 是否要求 participant 产出 artifact
-2. Artifact 是单文件 HTML+CSS+JS，路径 `turn-N/<name>/artifact.html`（round-1）和 `turn-N/<name>/artifact-r2.html`（round-2，可选）
+2. Artifact 是一个目录 `turn-N/<name>/artifact/`，与 `answer.md` 平级。最简形态是 `artifact/index.html`（单文件 HTML+CSS+JS）；目录结构预留了未来多文件 / Node 项目的扩展能力
 3. `outputMode` 在创建 session 时设置，可在 advance 时修改（outcome editor 提供 next-turn 切换）
 4. Round-1 pool 中注明"此 Reply 附带 HTML 原型"但不嵌入 artifact 内容——匿名池仍为纯 markdown
-5. Review materials block 用 `<!-- artifact:r1:<name> -->` / `<!-- artifact:r2:<name> -->` marker 标记有 artifact 的 participant，前端通过 API 获取 artifact 并在 sandboxed iframe 中预览
-6. Artifact 文件在 `draftOutcome` 时从 participant 分支 `git show` 拷贝到 vault main 的 `turn-N/<name>/` 目录（与 outcome.md 一起 commit），供 review 使用
+5. Review materials block 用 `<!-- artifact:<name> -->` marker 标记有 artifact 的 participant，前端通过 API 获取 artifact 并在 sandboxed iframe 中预览
+6. Artifact 目录在 `draftOutcome` 时从 participant 分支通过 `git ls-tree` + `git show` 整目录拷贝到 vault main（与 outcome.md 一起 commit），供 review 使用
+7. Round-2 不另起目录——agent 在原 `artifact/` 目录原地更新
 
 **上下文：** UX / 设计类脑暴主题中，纯 markdown 描述不够直观。Agent（如 Claude）完全有能力生成自包含的 HTML 文件作为低保真原型。目录结构 `turn-N/<participant>/` 本就支持任意文件类型（参见 TODO.md "Artifact 多形态"），此 ADR 激活了这个能力。
 
 **理由：**
-- 最简路径：单文件 HTML（inline CSS/JS，无外部依赖）= agent 最容易产出、用户最容易预览的 artifact 形态
-- `outputMode` 作为 session 级而非 turn 级配置，简化状态管理；advance 时可选覆盖兼顾灵活性
-- Round-1 pool 不嵌入 artifact HTML（会让匿名池过长且破坏 markdown 可读性），只标注"有 artifact"让 round-2 participant 知道这件事
-- Sandboxed iframe（`sandbox="allow-scripts"`，不含 `allow-same-origin`）预览 artifact，防止 XSS
+- 目录而非单文件：无法保证 single self-contained HTML 总是满足需求，目录结构预留了未来 Node 项目（`package.json` + 源码 → `npm start` 起服务 → proxy 到 iframe）的扩展路径
+- 最简启动路径：`artifact/index.html` 一个文件就够，agent 容易产出、API 直接 serve
+- Round-2 原地更新而非 `artifact-r2/`：artifact 是一个随 turn 演进的作品，不是两个独立版本。agent 在同一目录改文件更自然
+- `outputMode` 作为 session 级配置，简化状态管理；advance 时可选覆盖
+- Round-1 pool 不嵌入 artifact（会让匿名池过长），只标注"有 artifact"
+- Sandboxed iframe（`sandbox="allow-scripts"`，不含 `allow-same-origin`）预览，防止 XSS
 
 **考虑过的替代方案：**
-- 每 turn 单独设 outputMode → 状态多、UI 复杂，实际大部分 session 全程同一 mode
+- 单文件 `artifact.html` 替代目录 → 无法扩展到多文件项目
+- `artifact-r2/` 单独目录 → 不自然；agent 理解"修改同一份作品"更符合直觉
 - Artifact 嵌入 round-1 pool → pool 变太长，且 HTML 在 markdown 里不可读
-- 多文件 artifact（JS/CSS/图片分文件）→ 复杂度剧增，低保真原型不需要
 
 **结论 / 后续：**
-- `prompts.ts` round-1/round-2 task 模板在 `artifact=true` 时追加 artifact 指令
-- `orchestrator.ts` 的 `draftOutcome` 收集 artifact 文件并拷贝到 vault main
-- 新增 API route `GET /api/sessions/[id]/artifact?participant=&turn=&round=` 提供 artifact HTML
+- `prompts.ts` round-1/round-2 task 模板在 `artifact=true` 时追加 artifact 指令，指向 `artifact/index.html`
+- `orchestrator.ts` 的 `draftOutcome` 用 `git ls-tree` 枚举 + `git show` 逐文件拷贝 artifact 目录
+- 新增 API route `GET /api/sessions/[id]/artifact?participant=&turn=&file=index.html` serve 目录中文件
 - `ArtifactPreview` React 组件用 sandboxed iframe 渲染，集成到 `ReviewMaterials` 和 `OutcomeEditor`
 - `rules.md` 增加 artifact 段落说明协议约束
+- 未来扩展：Node 项目 artifact → orchestrator `npm install && npm start`，API proxy 到 dev server port
 
 ---
 

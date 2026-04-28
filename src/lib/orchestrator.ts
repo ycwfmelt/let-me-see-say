@@ -30,6 +30,8 @@ export type Phase =
   | typeof PHASE_FINALIZED
   | typeof PHASE_CANCELLED;
 
+export type OutputMode = "md-only" | "md-and-artifact";
+
 // ---------------------------------------------------------------------------
 // Session state
 // ---------------------------------------------------------------------------
@@ -191,7 +193,7 @@ export function generateSessionId(topic: string, today?: string): string {
 // ---------------------------------------------------------------------------
 
 export function generateRound1Pool(
-  answers: [string, string][],
+  answers: [string, string, boolean][],
   turn: number,
   rng?: { shuffle: <T>(arr: T[]) => T[] },
 ): string {
@@ -216,6 +218,10 @@ export function generateRound1Pool(
     parts.push(`## Reply ${labels[i]}`);
     parts.push("");
     parts.push(shuffled[i][1].trim());
+    if (shuffled[i][2]) {
+      parts.push("");
+      parts.push("_(This participant also produced an HTML artifact prototype.)_");
+    }
     parts.push("");
   }
   return parts.join("\n");
@@ -269,8 +275,15 @@ export function stripReviewMaterials(content: string): string {
   return content.replace(REVIEW_BLOCK_RE, "").trimEnd() + "\n";
 }
 
+export interface SubmissionEntry {
+  name: string;
+  answer: string;
+  refinement: string;
+  hasArtifact?: boolean;
+}
+
 export function buildReviewMaterials(
-  submissions: [string, string, string][],
+  submissions: SubmissionEntry[],
 ): string {
   const parts = [
     REVIEW_BEGIN_MARKER,
@@ -281,19 +294,23 @@ export function buildReviewMaterials(
     "_outcome before it's delivered to next turn's participants._",
     "",
   ];
-  for (const [name, answer, refinement] of submissions) {
-    parts.push(`## ${name}`);
+  for (const sub of submissions) {
+    parts.push(`## ${sub.name}`);
     parts.push("");
     parts.push("### Round 1 — independent answer");
     parts.push("");
-    parts.push(answer.trimEnd() || "_(no answer recorded)_");
+    parts.push(sub.answer.trimEnd() || "_(no answer recorded)_");
     parts.push("");
     parts.push(
       "### Round 2 — refinement after seeing the anonymized pool",
     );
     parts.push("");
-    parts.push(refinement.trimEnd() || "_(no refinement recorded)_");
+    parts.push(sub.refinement.trimEnd() || "_(no refinement recorded)_");
     parts.push("");
+    if (sub.hasArtifact) {
+      parts.push(`<!-- artifact:${sub.name} -->`);
+      parts.push("");
+    }
     parts.push("---");
     parts.push("");
   }
@@ -363,13 +380,15 @@ async function runRound1(
   session: Session,
   timeout: number | null = null,
   signal?: AbortSignal,
+  outputMode: OutputMode = "md-only",
 ): Promise<void> {
   const priorPath =
     session.currentTurn > 1
       ? `turn-${session.currentTurn - 1}/outcome.md`
       : undefined;
+  const wantArtifact = outputMode === "md-and-artifact";
   for (const p of session.participants) {
-    const text = prompts.round1Task(p.name, session.currentTurn, priorPath);
+    const text = prompts.round1Task(p.name, session.currentTurn, priorPath, wantArtifact);
     writeTask(p, text, `turn-${session.currentTurn}-r1`);
     p.wakeFor(`round-1-turn-${session.currentTurn}`);
   }
@@ -393,16 +412,18 @@ function deliverRound1Pool(
   session: Session,
   rng?: { shuffle: <T>(arr: T[]) => T[] },
 ): void {
-  const answers: [string, string][] = [];
+  const answers: [string, string, boolean][] = [];
   for (const p of session.participants) {
     const filePath = `turn-${session.currentTurn}/${p.name}/answer.md`;
+    const artDir = `turn-${session.currentTurn}/${p.name}/artifact/`;
     let content: string;
     try {
       content = gitOps.showFile(session.repoPath, p.branch, filePath);
     } catch {
       content = "(no answer found)";
     }
-    answers.push([p.name, content]);
+    const hasArtifact = gitOps.listTree(session.repoPath, p.branch, artDir).length > 0;
+    answers.push([p.name, content, hasArtifact]);
   }
   const pool = generateRound1Pool(answers, session.currentTurn, rng);
   for (const p of session.participants) {
@@ -422,9 +443,11 @@ async function runRound2(
   session: Session,
   timeout: number | null = null,
   signal?: AbortSignal,
+  outputMode: OutputMode = "md-only",
 ): Promise<void> {
+  const wantArtifact = outputMode === "md-and-artifact";
   for (const p of session.participants) {
-    const text = prompts.round2Task(p.name, session.currentTurn);
+    const text = prompts.round2Task(p.name, session.currentTurn, wantArtifact);
     writeTask(p, text, `turn-${session.currentTurn}-r2`);
     p.wakeFor(`round-2-turn-${session.currentTurn}`);
   }
@@ -445,17 +468,16 @@ async function runRound2(
 }
 
 function draftOutcome(session: Session): void {
-  const outcomePath = path.join(
-    session.repoPath,
-    `turn-${session.currentTurn}`,
-    "outcome.md",
-  );
+  const turnDir = `turn-${session.currentTurn}`;
+  const outcomePath = path.join(session.repoPath, turnDir, "outcome.md");
   fs.mkdirSync(path.dirname(outcomePath), { recursive: true });
 
-  const submissions: [string, string, string][] = [];
+  const submissions: SubmissionEntry[] = [];
+  const artifactFiles: string[] = [];
   for (const p of session.participants) {
-    const ansPath = `turn-${session.currentTurn}/${p.name}/answer.md`;
-    const refPath = `turn-${session.currentTurn}/${p.name}/refinement.md`;
+    const ansPath = `${turnDir}/${p.name}/answer.md`;
+    const refPath = `${turnDir}/${p.name}/refinement.md`;
+    const artDir = `${turnDir}/${p.name}/artifact/`;
     let answer: string;
     try {
       answer = gitOps.showFile(session.repoPath, p.branch, ansPath);
@@ -468,7 +490,22 @@ function draftOutcome(session: Session): void {
     } catch {
       refinement = "";
     }
-    submissions.push([p.name, answer, refinement]);
+
+    const artFiles = gitOps.listTree(session.repoPath, p.branch, artDir);
+    for (const relPath of artFiles) {
+      const fileContent = gitOps.showFile(session.repoPath, p.branch, relPath);
+      const dstPath = path.join(session.repoPath, relPath);
+      fs.mkdirSync(path.dirname(dstPath), { recursive: true });
+      fs.writeFileSync(dstPath, fileContent);
+      artifactFiles.push(relPath);
+    }
+
+    submissions.push({
+      name: p.name,
+      answer,
+      refinement,
+      hasArtifact: artFiles.length > 0,
+    });
   }
 
   const content =
@@ -477,9 +514,8 @@ function draftOutcome(session: Session): void {
     buildReviewMaterials(submissions) +
     "\n";
   fs.writeFileSync(outcomePath, content);
-  gitOps.commit(session.repoPath, `draft outcome: turn-${session.currentTurn}`, [
-    `turn-${session.currentTurn}/outcome.md`,
-  ]);
+  const commitFiles = [`${turnDir}/outcome.md`, ...artifactFiles];
+  gitOps.commit(session.repoPath, `draft outcome: turn-${session.currentTurn}`, commitFiles);
 }
 
 function dropTaskMdFromParticipants(session: Session): void {
@@ -563,6 +599,7 @@ export interface CreateSessionOptions {
   gitUserName?: string;
   gitUserEmail?: string;
   bootSettleSeconds?: number;
+  outputMode?: OutputMode;
 }
 
 export async function createSession(
@@ -631,6 +668,8 @@ export async function createSession(
   });
   session.saveManifest();
 
+  const outputMode = opts.outputMode ?? "md-only";
+
   await sleep(bootSettleSeconds * 1000);
 
   // Phase 1 — Boot
@@ -639,13 +678,13 @@ export async function createSession(
   session.saveManifest();
 
   // Phase 2 — Round 1
-  await runRound1(session, null, signal);
+  await runRound1(session, null, signal, outputMode);
   session.currentPhase = PHASE_ROUND_1_DONE;
   session.saveManifest();
 
   // Phase 3 — Pool + Round 2
   deliverRound1Pool(session);
-  await runRound2(session, null, signal);
+  await runRound2(session, null, signal, outputMode);
   session.currentPhase = PHASE_ROUND_2_DONE;
   session.saveManifest();
 
@@ -660,6 +699,7 @@ export async function createSession(
 export async function advanceToNextTurn(
   session: Session,
   signal?: AbortSignal,
+  outputMode?: OutputMode,
 ): Promise<Session> {
   if (session.currentPhase !== PHASE_OUTCOME_PENDING) {
     throw new Error(
@@ -667,6 +707,8 @@ export async function advanceToNextTurn(
         `expected ${JSON.stringify(PHASE_OUTCOME_PENDING)}`,
     );
   }
+
+  const turnOutputMode = outputMode ?? "md-only";
 
   commitPendingMainChanges(
     session,
@@ -679,12 +721,12 @@ export async function advanceToNextTurn(
   session.currentPhase = PHASE_INIT;
   session.saveManifest();
 
-  await runRound1(session, null, signal);
+  await runRound1(session, null, signal, turnOutputMode);
   session.currentPhase = PHASE_ROUND_1_DONE;
   session.saveManifest();
 
   deliverRound1Pool(session);
-  await runRound2(session, null, signal);
+  await runRound2(session, null, signal, turnOutputMode);
   session.currentPhase = PHASE_ROUND_2_DONE;
   session.saveManifest();
 

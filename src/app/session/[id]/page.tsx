@@ -78,9 +78,13 @@ export default function SessionPage({
     refresh();
   }, [id, refresh]);
 
-  const handleAdvance = useCallback(async () => {
+  const handleAdvance = useCallback(async (outputMode: string) => {
     setOrchestratorRunning(true);
-    await fetch(`/api/sessions/${id}/advance`, { method: "POST" });
+    await fetch(`/api/sessions/${id}/advance`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ outputMode }),
+    });
     refresh();
   }, [id, refresh]);
 

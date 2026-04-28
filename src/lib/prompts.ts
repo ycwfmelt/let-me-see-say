@@ -33,6 +33,20 @@ You are a participant in a multi-round, multi-turn brainstorm session.
    round-1 of all participants), refine your view, commit.
 4. Wait. Orchestrator + human produce \`turn-N/outcome.md\`. Next turn
    deepens that.
+
+## Artifacts
+
+Some turns may ask you to produce an **artifact** in addition to your
+markdown answer. An artifact is a single self-contained HTML file with
+inline CSS and JS — a low-fidelity prototype or visualization. When the
+task says to produce an artifact:
+
+- Write it to the path specified (e.g. \`turn-N/<your-name>/artifact.html\`).
+- Keep it self-contained: all CSS and JS inline, no external URLs or CDN
+  imports. Use placeholder content and simple styling.
+- The artifact is a quick sketch, not production code. Prioritize
+  conveying the idea over polish.
+- Stage and commit the artifact together with your markdown answer.
 `;
 
 export function rules(): string {
@@ -74,10 +88,25 @@ export function round1Task(
   name: string,
   turn: number,
   priorOutcomePath?: string,
+  artifact = false,
 ): string {
   const priorSection = priorOutcomePath
     ? `**Context**: previous turn's outcome is in \`${priorOutcomePath}\`. Read it and build on it — this turn deepens the direction it set.\n\n`
     : "";
+
+  const artifactSection = artifact
+    ? `3. Create a **single self-contained HTML file** at
+   \`turn-${turn}/${name}/artifact.html\`. Inline all CSS and JS — no
+   external imports. This is a low-fidelity prototype or visualization
+   that illustrates your answer. Prioritize conveying the idea over
+   polish.\n`
+    : "";
+
+  const statusStep = artifact ? "4" : "3";
+  const commitStep = artifact ? "5" : "4";
+  const gitAddFiles = artifact
+    ? `turn-${turn}/${name}/answer.md turn-${turn}/${name}/artifact.html .brainstorm/status/turn-${turn}.${name}.md`
+    : `turn-${turn}/${name}/answer.md .brainstorm/status/turn-${turn}.${name}.md`;
 
   return `# Turn ${turn} · Round 1 — independent answer
 
@@ -85,7 +114,7 @@ ${priorSection}1. Read \`00_topic.md\` for the brainstorm topic.
 2. Write your **independent** view to \`turn-${turn}/${name}/answer.md\`.
    Don't worry about consensus; speak your mind. You will not see other
    participants' answers in this round.
-3. Write \`.brainstorm/status/turn-${turn}.${name}.md\`:
+${artifactSection}${statusStep}. Write \`.brainstorm/status/turn-${turn}.${name}.md\`:
 
    \`\`\`
    ---
@@ -95,10 +124,10 @@ ${priorSection}1. Read \`00_topic.md\` for the brainstorm topic.
    ---
    \`\`\`
 
-4. Stage and commit:
+${commitStep}. Stage and commit:
 
    \`\`\`
-   git add turn-${turn}/${name}/answer.md .brainstorm/status/turn-${turn}.${name}.md
+   git add ${gitAddFiles}
    git commit -m "turn-${turn}: ${name}"
    \`\`\`
 
@@ -106,7 +135,21 @@ Wait silently after committing.
 `;
 }
 
-export function round2Task(name: string, turn: number): string {
+export function round2Task(name: string, turn: number, artifact = false): string {
+  const artifactSection = artifact
+    ? `3. Optionally update your artifact at
+   \`turn-${turn}/${name}/artifact-r2.html\` (or copy and refine from
+   your round-1 \`artifact.html\`). If the peer views changed your
+   thinking, reflect that in the prototype. If unchanged, you may skip
+   this file.\n`
+    : "";
+
+  const statusStep = artifact ? "4" : "3";
+  const commitStep = artifact ? "5" : "4";
+  const gitAddFiles = artifact
+    ? `turn-${turn}/${name}/refinement.md .brainstorm/status/turn-${turn}-r2.${name}.md turn-${turn}/${name}/artifact-r2.html`
+    : `turn-${turn}/${name}/refinement.md .brainstorm/status/turn-${turn}-r2.${name}.md`;
+
   return `# Turn ${turn} · Round 2 — refine after seeing the pool
 
 1. Read \`.brainstorm/round-1-pool.md\`. It contains all participants'
@@ -114,7 +157,7 @@ export function round2Task(name: string, turn: number): string {
    as peer views.
 2. Refine, critique, or build on those views. Write to
    \`turn-${turn}/${name}/refinement.md\`.
-3. Write \`.brainstorm/status/turn-${turn}-r2.${name}.md\`:
+${artifactSection}${statusStep}. Write \`.brainstorm/status/turn-${turn}-r2.${name}.md\`:
 
    \`\`\`
    ---
@@ -124,10 +167,10 @@ export function round2Task(name: string, turn: number): string {
    ---
    \`\`\`
 
-4. Stage and commit:
+${commitStep}. Stage and commit:
 
    \`\`\`
-   git add turn-${turn}/${name}/refinement.md .brainstorm/status/turn-${turn}-r2.${name}.md
+   git add ${gitAddFiles}
    git commit -m "turn-${turn}-r2: ${name}"
    \`\`\`
 

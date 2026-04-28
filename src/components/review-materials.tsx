@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { Markdown } from "./markdown";
+import { ArtifactPreview } from "./artifact-preview";
 
 const REVIEW_BEGIN =
   "<!-- BEGIN REVIEW MATERIALS (stripped before next-turn delivery) -->";
@@ -11,6 +12,7 @@ interface Submission {
   name: string;
   round1: string;
   round2: string;
+  hasArtifact: boolean;
 }
 
 function parseReviewBlock(raw: string): Submission[] {
@@ -65,7 +67,9 @@ function parseReviewBlock(raw: string): Submission[] {
       if (round2 === "_(no refinement recorded)_") round2 = "";
     }
 
-    submissions.push({ name, round1, round2 });
+    const hasArtifact = chunk.includes(`<!-- artifact:${name} -->`);
+
+    submissions.push({ name, round1, round2, hasArtifact });
   }
   return submissions;
 }
@@ -117,9 +121,13 @@ type ViewMode = "participants" | "rounds";
 function SubmissionCard({
   submission,
   defaultOpen,
+  sessionId,
+  turn,
 }: {
   submission: Submission;
   defaultOpen: boolean;
+  sessionId?: string;
+  turn?: number;
 }) {
   const [activeTab, setActiveTab] = useState<"r1" | "r2">(
     submission.round2 ? "r2" : "r1",
@@ -189,6 +197,17 @@ function SubmissionCard({
                 <p className="text-gray-500 text-sm italic">No submission</p>
               )}
             </div>
+
+            {/* Artifact preview */}
+            {submission.hasArtifact && sessionId && turn != null && (
+              <div className="p-4 border-t border-gray-700">
+                <ArtifactPreview
+                  sessionId={sessionId}
+                  participant={submission.name}
+                  turn={turn}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -208,10 +227,16 @@ function RoundViewCard({
   name,
   content,
   roundLabel,
+  hasArtifact,
+  sessionId,
+  turn,
 }: {
   name: string;
   content: string;
   roundLabel: string;
+  hasArtifact?: boolean;
+  sessionId?: string;
+  turn?: number;
 }) {
   const [modal, setModal] = useState(false);
 
@@ -235,6 +260,16 @@ function RoundViewCard({
             <p className="text-gray-500 text-sm italic">No submission</p>
           )}
         </div>
+
+        {hasArtifact && sessionId && turn != null && (
+          <div className="p-4 border-t border-gray-700">
+            <ArtifactPreview
+              sessionId={sessionId}
+              participant={name}
+              turn={turn}
+            />
+          </div>
+        )}
       </div>
 
       {modal && content && (
@@ -251,9 +286,13 @@ function RoundViewCard({
 function RoundView({
   submissions,
   round,
+  sessionId,
+  turn,
 }: {
   submissions: Submission[];
   round: "r1" | "r2";
+  sessionId?: string;
+  turn?: number;
 }) {
   const roundLabel = round === "r1" ? "Round 1" : "Round 2";
   return (
@@ -264,13 +303,24 @@ function RoundView({
           name={s.name}
           content={round === "r1" ? s.round1 : s.round2}
           roundLabel={roundLabel}
+          hasArtifact={s.hasArtifact}
+          sessionId={sessionId}
+          turn={turn}
         />
       ))}
     </div>
   );
 }
 
-export function ReviewMaterials({ content }: { content: string }) {
+export function ReviewMaterials({
+  content,
+  sessionId,
+  turn,
+}: {
+  content: string;
+  sessionId?: string;
+  turn?: number;
+}) {
   const [open, setOpen] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("participants");
   const [roundTab, setRoundTab] = useState<"r1" | "r2">("r2");
@@ -331,6 +381,8 @@ export function ReviewMaterials({ content }: { content: string }) {
                 key={s.name}
                 submission={s}
                 defaultOpen={i === 0}
+                sessionId={sessionId}
+                turn={turn}
               />
             ))
           ) : (
@@ -360,7 +412,12 @@ export function ReviewMaterials({ content }: { content: string }) {
                   Round 2 — Refined Views
                 </button>
               </div>
-              <RoundView submissions={submissions} round={roundTab} />
+              <RoundView
+                submissions={submissions}
+                round={roundTab}
+                sessionId={sessionId}
+                turn={turn}
+              />
             </>
           )}
         </div>
