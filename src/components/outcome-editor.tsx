@@ -224,7 +224,7 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
       <div className="flex gap-4" style={{ minHeight: "60vh" }}>
         {/* Left: Answer content */}
         <div className="flex-1 min-w-0 flex flex-col border border-ctp-surface1 rounded-lg overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2.5 bg-ctp-base border-b border-ctp-surface1 shrink-0">
+          <div className="flex items-center justify-between px-4 py-2.5 bg-ctp-crust border-b border-ctp-surface1 shrink-0">
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -317,7 +317,7 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
 
         {/* Right: Outcome sidebar */}
         <div className="w-80 shrink-0 flex flex-col border border-ctp-surface1 rounded-lg overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2.5 bg-ctp-base border-b border-ctp-surface1 shrink-0">
+          <div className="flex items-center justify-between px-4 py-2.5 bg-ctp-crust border-b border-ctp-surface1 shrink-0">
             <span className="font-medium text-sm text-ctp-subtext1">
               Turn {turn} — Outcome
             </span>
@@ -408,7 +408,7 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
             <button
               type="button"
               onClick={handleAdvance}
-              className="w-full px-3 py-2 bg-ctp-blue hover:bg-ctp-blue-400 text-ctp-crust text-sm rounded transition-colors"
+              className="w-full px-3 py-2 bg-ctp-blue hover:bg-ctp-blue-400 text-ctp-base text-sm rounded transition-colors"
             >
               Advance to Next Turn
             </button>
@@ -436,7 +436,7 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
           </button>
           <button
             onClick={handleAdvance}
-            className="px-4 py-1.5 bg-ctp-blue hover:bg-ctp-blue-400 text-ctp-crust text-sm rounded-md transition-colors"
+            className="px-4 py-1.5 bg-ctp-blue hover:bg-ctp-blue-400 text-ctp-base text-sm rounded-md transition-colors"
           >
             Advance to Next Turn
           </button>

@@ -152,7 +152,7 @@ export function CreateSessionForm() {
       <button
         type="submit"
         disabled={creating || !topic || !vaultPath || selected.size === 0}
-        className="px-4 py-2 bg-ctp-blue hover:bg-ctp-blue-400 disabled:bg-ctp-surface0 disabled:text-ctp-overlay0 text-ctp-crust text-sm rounded-lg transition-colors"
+        className="px-4 py-2 bg-ctp-blue hover:bg-ctp-blue-400 disabled:bg-ctp-surface0 disabled:text-ctp-overlay0 text-ctp-base text-sm rounded-lg transition-colors"
       >
         {creating ? "Creating..." : "Start Session"}
       </button>

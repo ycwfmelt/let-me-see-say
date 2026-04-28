@@ -156,7 +156,7 @@ export default function SessionPage({
               {canResume && (
                 <button
                   onClick={handleResume}
-                  className="px-3 py-1.5 text-sm bg-ctp-green/80 hover:bg-ctp-green text-ctp-crust rounded-md transition-colors"
+                  className="px-3 py-1.5 text-sm bg-ctp-green/80 hover:bg-ctp-green text-ctp-base rounded-md transition-colors"
                 >
                   Resume
                 </button>
@@ -164,7 +164,7 @@ export default function SessionPage({
               {isOutcomePending && (
                 <button
                   onClick={handleFinalize}
-                  className="px-3 py-1.5 text-sm border border-ctp-surface2 text-ctp-subtext1 hover:bg-ctp-base rounded-md transition-colors"
+                  className="px-3 py-1.5 text-sm border border-ctp-surface2 text-ctp-subtext1 hover:bg-ctp-crust rounded-md transition-colors"
                 >
                   Finalize
                 </button>

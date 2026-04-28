@@ -93,17 +93,17 @@ function ContentModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ctp-crust/80 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-[85vw] h-[80vh] flex flex-col rounded-xl border border-ctp-surface1 bg-ctp-crust shadow-2xl overflow-hidden">
+      <div className="w-[85vw] h-[80vh] flex flex-col rounded-xl border border-ctp-surface1 bg-ctp-base shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 bg-ctp-mantle border-b border-ctp-surface1">
           <span className="font-medium text-sm text-ctp-subtext1">{title}</span>
           <button
             onClick={onClose}
-            className="px-2 py-0.5 text-xs text-ctp-subtext0 hover:text-ctp-subtext1 border border-ctp-surface1 rounded hover:bg-ctp-base transition-colors"
+            className="px-2 py-0.5 text-xs text-ctp-subtext0 hover:text-ctp-subtext1 border border-ctp-surface1 rounded hover:bg-ctp-crust transition-colors"
           >
             ESC
           </button>
@@ -148,7 +148,7 @@ function SubmissionCard({
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center justify-between px-4 py-2.5 bg-ctp-base hover:bg-ctp-base/80 transition-colors"
+          className="w-full flex items-center justify-between px-4 py-2.5 bg-ctp-crust hover:bg-ctp-crust/80 transition-colors"
         >
           <span className="font-medium text-sm text-ctp-subtext1">
             {submission.name}
@@ -257,7 +257,7 @@ function RoundViewCard({
   return (
     <>
       <div className="border border-ctp-surface1 rounded-lg overflow-hidden group">
-        <div className="flex items-center justify-between px-4 py-2 bg-ctp-base border-b border-ctp-surface1">
+        <div className="flex items-center justify-between px-4 py-2 bg-ctp-crust border-b border-ctp-surface1">
           <span className="font-medium text-sm text-ctp-subtext1">{name}</span>
           <button
             type="button"
@@ -357,7 +357,7 @@ export function ReviewMaterials({
   return (
     <div className="border border-ctp-surface1 rounded-lg overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-ctp-base">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-ctp-crust">
         <button
           type="button"
           onClick={() => setOpen(!open)}

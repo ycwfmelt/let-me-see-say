@@ -14,7 +14,7 @@ export function ParticipantPanel({ name, type, branch, paneContent }: Props) {
     <div className="flex-1 min-w-0">
       <div className="flex items-center gap-2 mb-2">
         <h3 className="font-semibold text-sm">{name}</h3>
-        <span className="text-xs px-1.5 py-0.5 rounded bg-ctp-base text-ctp-subtext0">
+        <span className="text-xs px-1.5 py-0.5 rounded bg-ctp-crust text-ctp-subtext0">
           {type}
         </span>
       </div>

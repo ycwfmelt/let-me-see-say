@@ -40,7 +40,7 @@ export function SessionCard({
           {participants.map((p) => (
             <span
               key={p.name}
-              className="text-xs px-1.5 py-0.5 rounded bg-ctp-base text-ctp-subtext0"
+              className="text-xs px-1.5 py-0.5 rounded bg-ctp-crust text-ctp-subtext0"
             >
               {p.name}
             </span>

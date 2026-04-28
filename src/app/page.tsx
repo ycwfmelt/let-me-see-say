@@ -29,7 +29,7 @@ export default function Home() {
         <h1 className="text-2xl font-bold">let-me-see-say</h1>
         <button
           onClick={() => setShowCreate(!showCreate)}
-          className="px-4 py-2 bg-ctp-blue hover:bg-ctp-blue-400 text-ctp-crust text-sm rounded-lg transition-colors"
+          className="px-4 py-2 bg-ctp-blue hover:bg-ctp-blue-400 text-ctp-base text-sm rounded-lg transition-colors"
         >
           {showCreate ? "Cancel" : "New Session"}
         </button>

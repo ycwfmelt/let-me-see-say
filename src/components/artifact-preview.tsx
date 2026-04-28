@@ -33,20 +33,20 @@ export function ArtifactPreview({
 
   return (
     <div className="border border-ctp-surface1 rounded-lg overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2 bg-ctp-base border-b border-ctp-surface1">
+      <div className="flex items-center justify-between px-3 py-2 bg-ctp-crust border-b border-ctp-surface1">
         <span className="text-xs font-medium text-ctp-subtext1">{title}</span>
         <div className="flex gap-1">
           <button
             type="button"
             onClick={handleViewSource}
-            className="px-2 py-0.5 text-xs text-ctp-subtext0 hover:text-ctp-subtext1 border border-ctp-surface1 rounded hover:bg-ctp-base transition-colors"
+            className="px-2 py-0.5 text-xs text-ctp-subtext0 hover:text-ctp-subtext1 border border-ctp-surface1 rounded hover:bg-ctp-crust transition-colors"
           >
             {showSource ? "Preview" : "Source"}
           </button>
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
-            className="px-2 py-0.5 text-xs text-ctp-subtext0 hover:text-ctp-subtext1 border border-ctp-surface1 rounded hover:bg-ctp-base transition-colors"
+            className="px-2 py-0.5 text-xs text-ctp-subtext0 hover:text-ctp-subtext1 border border-ctp-surface1 rounded hover:bg-ctp-crust transition-colors"
           >
             {expanded ? "Collapse" : "Expand"}
           </button>
