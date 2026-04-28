@@ -327,6 +327,7 @@ export { draftOutcome as _draftOutcome };
 export { deliverOutcomeToParticipants as _deliverOutcomeToParticipants };
 export { commitPendingMainChanges as _commitPendingMainChanges };
 export { resolveSessionPaths as _resolveSessionPaths };
+export { cleanWorktreeForLateJoiner as _cleanWorktreeForLateJoiner };
 
 function writeTask(
   participant: Participant,
@@ -587,6 +588,127 @@ function deliverOutcomeToParticipants(session: Session): void {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// ---------------------------------------------------------------------------
+// Add participant at turn boundary
+// ---------------------------------------------------------------------------
+
+export interface AddParticipantOptions {
+  profileName: string;
+  agentProfiles: Record<string, AgentProfile>;
+  bootSettleSeconds?: number;
+}
+
+export async function addParticipantToSession(
+  session: Session,
+  opts: AddParticipantOptions,
+  signal?: AbortSignal,
+): Promise<Participant> {
+  if (session.currentPhase !== PHASE_OUTCOME_PENDING) {
+    throw new Error(
+      `Cannot add participant: session is in phase ${JSON.stringify(session.currentPhase)}, ` +
+        `expected ${JSON.stringify(PHASE_OUTCOME_PENDING)}`,
+    );
+  }
+
+  const { profileName, agentProfiles } = opts;
+
+  if (session.participants.some((p) => p.name === profileName)) {
+    throw new Error(
+      `Participant ${JSON.stringify(profileName)} already exists in this session`,
+    );
+  }
+
+  const profile = agentProfiles[profileName];
+  if (!profile) {
+    throw new Error(
+      `Unknown agent profile: ${JSON.stringify(profileName)}. ` +
+        `Available: ${JSON.stringify(Object.keys(agentProfiles).sort())}`,
+    );
+  }
+
+  const worktree = path.join(session.privateWorkspaces, profileName);
+  gitOps.addWorktree(
+    session.repoPath,
+    worktree,
+    `participant/${session.sessionId}/${profileName}`,
+  );
+
+  // The worktree starts from main which has unstripped outcomes and
+  // artifact directories from other participants (copied for human review).
+  // Clean them up so the new participant only sees stripped outcomes.
+  cleanWorktreeForLateJoiner(
+    worktree,
+    session.currentTurn,
+    session.participants.map((p) => p.name),
+  );
+
+  const agent = new TUIAgent(
+    profileName,
+    session.sessionId,
+    worktree,
+    profile,
+  );
+  agent.start();
+  session.participants.push(agent);
+  session.saveManifest();
+
+  await sleep((opts.bootSettleSeconds ?? 8) * 1000);
+
+  const text = prompts.bootTask(profileName, session.sessionId);
+  writeTask(agent, text, "boot");
+  const statusDir = path.join(worktree, ".brainstorm", "status");
+  fs.mkdirSync(statusDir, { recursive: true });
+  agent.wakeFor("boot");
+
+  await gitOps.waitForSubject(
+    session.repoPath,
+    agent.branch,
+    prompts.readySubject(profileName),
+    2.0,
+    null,
+    signal,
+  );
+
+  session.saveManifest();
+  return agent;
+}
+
+function cleanWorktreeForLateJoiner(
+  worktreePath: string,
+  currentTurn: number,
+  existingParticipantNames: string[],
+): void {
+  let dirty = false;
+  for (let t = 1; t <= currentTurn; t++) {
+    const turnDir = path.join(worktreePath, `turn-${t}`);
+    if (!fs.existsSync(turnDir)) continue;
+
+    // Strip review materials from outcome.md
+    const outcomePath = path.join(turnDir, "outcome.md");
+    if (fs.existsSync(outcomePath)) {
+      const content = fs.readFileSync(outcomePath, "utf-8");
+      const stripped = stripReviewMaterials(content);
+      if (stripped !== content) {
+        fs.writeFileSync(outcomePath, stripped);
+        dirty = true;
+      }
+    }
+
+    // Remove other participants' directories (artifact dirs copied to main for review)
+    for (const name of existingParticipantNames) {
+      const participantDir = path.join(turnDir, name);
+      if (fs.existsSync(participantDir)) {
+        fs.rmSync(participantDir, { recursive: true, force: true });
+        dirty = true;
+      }
+    }
+  }
+
+  if (dirty) {
+    gitOps.commit(worktreePath, "setup: clean worktree for late joiner");
+  }
 }
 
 export interface CreateSessionOptions {

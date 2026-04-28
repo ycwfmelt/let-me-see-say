@@ -5,7 +5,8 @@ export type EventType =
   | "session:log"
   | "session:cancelled"
   | "session:finalized"
-  | "participant:pane-update";
+  | "participant:pane-update"
+  | "participant:added";
 
 export interface SessionEvent {
   type: EventType;
