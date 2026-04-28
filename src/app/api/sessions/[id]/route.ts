@@ -23,7 +23,6 @@ export async function GET(
     repoPath: session.repoPath,
     currentTurn: session.currentTurn,
     currentPhase: session.currentPhase,
-    outputMode: session.outputMode,
     participants: session.participants.map((p) => ({
       name: p.name,
       type: p.type,

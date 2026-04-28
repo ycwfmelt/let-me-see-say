@@ -45,7 +45,6 @@ export interface SessionData {
   participants: Participant[];
   currentTurn: number;
   currentPhase: Phase;
-  outputMode: OutputMode;
 }
 
 export class Session {
@@ -57,7 +56,6 @@ export class Session {
   participants: Participant[];
   currentTurn: number;
   currentPhase: Phase;
-  outputMode: OutputMode;
 
   constructor(data: SessionData) {
     this.sessionId = data.sessionId;
@@ -68,7 +66,6 @@ export class Session {
     this.participants = data.participants;
     this.currentTurn = data.currentTurn;
     this.currentPhase = data.currentPhase;
-    this.outputMode = data.outputMode;
   }
 
   get manifestPath(): string {
@@ -93,7 +90,6 @@ export class Session {
       participants: this.participants.map(serializeParticipant),
       current_turn: this.currentTurn,
       current_phase: this.currentPhase,
-      output_mode: this.outputMode,
     };
   }
 }
@@ -162,7 +158,6 @@ export function loadSession(
     participants,
     currentTurn: data.current_turn,
     currentPhase: data.current_phase,
-    outputMode: data.output_mode ?? "md-only",
   });
 }
 
@@ -385,12 +380,13 @@ async function runRound1(
   session: Session,
   timeout: number | null = null,
   signal?: AbortSignal,
+  outputMode: OutputMode = "md-only",
 ): Promise<void> {
   const priorPath =
     session.currentTurn > 1
       ? `turn-${session.currentTurn - 1}/outcome.md`
       : undefined;
-  const wantArtifact = session.outputMode === "md-and-artifact";
+  const wantArtifact = outputMode === "md-and-artifact";
   for (const p of session.participants) {
     const text = prompts.round1Task(p.name, session.currentTurn, priorPath, wantArtifact);
     writeTask(p, text, `turn-${session.currentTurn}-r1`);
@@ -447,8 +443,9 @@ async function runRound2(
   session: Session,
   timeout: number | null = null,
   signal?: AbortSignal,
+  outputMode: OutputMode = "md-only",
 ): Promise<void> {
-  const wantArtifact = session.outputMode === "md-and-artifact";
+  const wantArtifact = outputMode === "md-and-artifact";
   for (const p of session.participants) {
     const text = prompts.round2Task(p.name, session.currentTurn, wantArtifact);
     writeTask(p, text, `turn-${session.currentTurn}-r2`);
@@ -668,9 +665,10 @@ export async function createSession(
     participants,
     currentTurn: 1,
     currentPhase: PHASE_INIT,
-    outputMode: opts.outputMode ?? "md-only",
   });
   session.saveManifest();
+
+  const outputMode = opts.outputMode ?? "md-only";
 
   await sleep(bootSettleSeconds * 1000);
 
@@ -680,13 +678,13 @@ export async function createSession(
   session.saveManifest();
 
   // Phase 2 — Round 1
-  await runRound1(session, null, signal);
+  await runRound1(session, null, signal, outputMode);
   session.currentPhase = PHASE_ROUND_1_DONE;
   session.saveManifest();
 
   // Phase 3 — Pool + Round 2
   deliverRound1Pool(session);
-  await runRound2(session, null, signal);
+  await runRound2(session, null, signal, outputMode);
   session.currentPhase = PHASE_ROUND_2_DONE;
   session.saveManifest();
 
@@ -710,9 +708,7 @@ export async function advanceToNextTurn(
     );
   }
 
-  if (outputMode) {
-    session.outputMode = outputMode;
-  }
+  const turnOutputMode = outputMode ?? "md-only";
 
   commitPendingMainChanges(
     session,
@@ -725,12 +721,12 @@ export async function advanceToNextTurn(
   session.currentPhase = PHASE_INIT;
   session.saveManifest();
 
-  await runRound1(session, null, signal);
+  await runRound1(session, null, signal, turnOutputMode);
   session.currentPhase = PHASE_ROUND_1_DONE;
   session.saveManifest();
 
   deliverRound1Pool(session);
-  await runRound2(session, null, signal);
+  await runRound2(session, null, signal, turnOutputMode);
   session.currentPhase = PHASE_ROUND_2_DONE;
   session.saveManifest();
 

@@ -63,7 +63,7 @@ export class SessionStore {
     topic: string;
     vaultPath: string;
     participants: string[];
-    outputMode?: orchestrator.OutputMode;
+    outputMode?: "md-only" | "md-and-artifact";
   }): string {
     const profiles = loadAgentProfiles(this.agentsTomlPath);
     const sessionId = orchestrator.generateSessionId(opts.topic);
@@ -146,7 +146,7 @@ export class SessionStore {
     this.startPaneCapture(sessionId);
   }
 
-  advanceSession(sessionId: string, outputMode?: orchestrator.OutputMode): void {
+  advanceSession(sessionId: string, outputMode?: "md-only" | "md-and-artifact"): void {
     const session = this.getSession(sessionId);
     if (!session) throw new Error(`Session ${sessionId} not found`);
 

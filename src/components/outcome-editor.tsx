@@ -7,8 +7,7 @@ type OutputMode = "md-only" | "md-and-artifact";
 
 interface Props {
   sessionId: string;
-  outputMode: OutputMode;
-  onAdvance: (outputMode?: OutputMode) => void;
+  onAdvance: (outputMode: OutputMode) => void;
 }
 
 type OutcomeKind = "decision" | "open-questions" | "summary";
@@ -105,7 +104,7 @@ function serializeOutcome(
   return parts.join("\n");
 }
 
-export function OutcomeEditor({ sessionId, outputMode: initialOutputMode, onAdvance }: Props) {
+export function OutcomeEditor({ sessionId, onAdvance }: Props) {
   const [turn, setTurn] = useState(0);
   const [kind, setKind] = useState<OutcomeKind | "">("");
   const [decision, setDecision] = useState("");
@@ -115,7 +114,7 @@ export function OutcomeEditor({ sessionId, outputMode: initialOutputMode, onAdva
   const [loaded, setLoaded] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
   const [rawContent, setRawContent] = useState("");
-  const [nextOutputMode, setNextOutputMode] = useState<OutputMode>(initialOutputMode);
+  const [nextOutputMode, setNextOutputMode] = useState<OutputMode>("md-only");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -182,7 +181,7 @@ export function OutcomeEditor({ sessionId, outputMode: initialOutputMode, onAdva
   const handleAdvance = async () => {
     const content = serializeOutcome(turn, kind, decision, notes, reviewBlock);
     await save(content);
-    onAdvance(nextOutputMode !== initialOutputMode ? nextOutputMode : undefined);
+    onAdvance(nextOutputMode);
   };
 
   if (!loaded) {

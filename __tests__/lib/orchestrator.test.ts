@@ -270,7 +270,6 @@ describe("draftOutcome", () => {
       participants: [agent],
       currentTurn: 1,
       currentPhase: PHASE_OUTCOME_PENDING,
-      outputMode: "md-only",
     });
 
     _draftOutcome(session);
@@ -333,7 +332,6 @@ describe("deliverOutcomeToParticipants", () => {
       participants: [agent],
       currentTurn: 1,
       currentPhase: PHASE_OUTCOME_PENDING,
-      outputMode: "md-only",
     });
 
     _deliverOutcomeToParticipants(session);
@@ -384,7 +382,6 @@ function makeTestSession(): Session {
     participants: [agent],
     currentTurn: 2,
     currentPhase: PHASE_OUTCOME_PENDING,
-    outputMode: "md-only",
   });
 }
 
@@ -427,7 +424,6 @@ describe("manifest roundtrip", () => {
       ],
       currentTurn: 1,
       currentPhase: "init",
-      outputMode: "md-only",
     });
     session.saveManifest();
     const loaded = loadSession("human-session", path.join(tmpDir, "wk"));
@@ -496,7 +492,6 @@ function makeFinalizeReadySession(): { session: Session; repo: string } {
     participants: [a, b],
     currentTurn: 1,
     currentPhase: PHASE_OUTCOME_PENDING,
-    outputMode: "md-only",
   });
   return { session, repo };
 }
@@ -584,7 +579,6 @@ describe("finalize", () => {
       participants: [a, b],
       currentTurn: 1,
       currentPhase: PHASE_OUTCOME_PENDING,
-      outputMode: "md-only",
     });
 
     finalize(session);
@@ -662,7 +656,6 @@ describe("finalize", () => {
       participants: [a, b],
       currentTurn: 1,
       currentPhase: PHASE_OUTCOME_PENDING,
-      outputMode: "md-only",
     });
 
     finalize(session);
@@ -725,7 +718,6 @@ describe("advance commits dirty outcome", () => {
       participants: [a],
       currentTurn: 1,
       currentPhase: PHASE_OUTCOME_PENDING,
-      outputMode: "md-only",
     });
     session.saveManifest();
 
