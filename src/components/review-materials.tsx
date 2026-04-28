@@ -8,14 +8,14 @@ const REVIEW_BEGIN =
   "<!-- BEGIN REVIEW MATERIALS (stripped before next-turn delivery) -->";
 const REVIEW_END = "<!-- END REVIEW MATERIALS -->";
 
-interface Submission {
+export interface Submission {
   name: string;
   round1: string;
   round2: string;
   hasArtifact: boolean;
 }
 
-function parseReviewBlock(raw: string): Submission[] {
+export function parseReviewBlock(raw: string): Submission[] {
   let body = raw
     .replace(REVIEW_BEGIN, "")
     .replace(REVIEW_END, "")
@@ -123,11 +123,15 @@ function SubmissionCard({
   defaultOpen,
   sessionId,
   turn,
+  index,
+  onExpand,
 }: {
   submission: Submission;
   defaultOpen: boolean;
   sessionId?: string;
   turn?: number;
+  index?: number;
+  onExpand?: (idx: number, round: "r1" | "r2") => void;
 }) {
   const [activeTab, setActiveTab] = useState<"r1" | "r2">(
     submission.round2 ? "r2" : "r1",
@@ -182,7 +186,11 @@ function SubmissionCard({
               </button>
               <button
                 type="button"
-                onClick={() => setModal(true)}
+                onClick={() =>
+                  onExpand
+                    ? onExpand(index!, activeTab)
+                    : setModal(true)
+                }
                 className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 border-l border-gray-700 transition-colors"
               >
                 Expand
@@ -212,7 +220,7 @@ function SubmissionCard({
         )}
       </div>
 
-      {modal && content && (
+      {!onExpand && modal && content && (
         <ContentModal
           title={`${submission.name} — ${roundLabel}`}
           content={content}
@@ -230,6 +238,9 @@ function RoundViewCard({
   hasArtifact,
   sessionId,
   turn,
+  index,
+  round,
+  onExpand,
 }: {
   name: string;
   content: string;
@@ -237,6 +248,9 @@ function RoundViewCard({
   hasArtifact?: boolean;
   sessionId?: string;
   turn?: number;
+  index?: number;
+  round?: "r1" | "r2";
+  onExpand?: (idx: number, round: "r1" | "r2") => void;
 }) {
   const [modal, setModal] = useState(false);
 
@@ -247,7 +261,11 @@ function RoundViewCard({
           <span className="font-medium text-sm text-gray-200">{name}</span>
           <button
             type="button"
-            onClick={() => setModal(true)}
+            onClick={() =>
+              onExpand
+                ? onExpand(index!, round!)
+                : setModal(true)
+            }
             className="text-xs text-gray-500 hover:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity"
           >
             Expand
@@ -272,7 +290,7 @@ function RoundViewCard({
         )}
       </div>
 
-      {modal && content && (
+      {!onExpand && modal && content && (
         <ContentModal
           title={`${name} — ${roundLabel}`}
           content={content}
@@ -288,16 +306,18 @@ function RoundView({
   round,
   sessionId,
   turn,
+  onExpand,
 }: {
   submissions: Submission[];
   round: "r1" | "r2";
   sessionId?: string;
   turn?: number;
+  onExpand?: (idx: number, round: "r1" | "r2") => void;
 }) {
   const roundLabel = round === "r1" ? "Round 1" : "Round 2";
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {submissions.map((s) => (
+      {submissions.map((s, i) => (
         <RoundViewCard
           key={s.name}
           name={s.name}
@@ -306,6 +326,9 @@ function RoundView({
           hasArtifact={s.hasArtifact}
           sessionId={sessionId}
           turn={turn}
+          index={i}
+          round={round}
+          onExpand={onExpand}
         />
       ))}
     </div>
@@ -316,10 +339,12 @@ export function ReviewMaterials({
   content,
   sessionId,
   turn,
+  onExpand,
 }: {
   content: string;
   sessionId?: string;
   turn?: number;
+  onExpand?: (idx: number, round: "r1" | "r2") => void;
 }) {
   const [open, setOpen] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("participants");
@@ -383,6 +408,8 @@ export function ReviewMaterials({
                 defaultOpen={i === 0}
                 sessionId={sessionId}
                 turn={turn}
+                index={i}
+                onExpand={onExpand}
               />
             ))
           ) : (
@@ -417,6 +444,7 @@ export function ReviewMaterials({
                 round={roundTab}
                 sessionId={sessionId}
                 turn={turn}
+                onExpand={onExpand}
               />
             </>
           )}
