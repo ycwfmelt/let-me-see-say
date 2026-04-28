@@ -1,7 +1,7 @@
 # let-me-see-say · 设计文档
 
-> 状态：MVP 实施完成，端到端跑过一次（见 `examples/`）。
-> 最近更新：2026-04-27
+> 状态：TypeScript + Next.js 重写完成，Web UI 可用。
+> 最近更新：2026-04-28
 
 本地多模型脑暴 orchestrator。多个参与者（CLI agent；未来还有 human）就一个主题在多个 turn 里层层深入；每 turn 内分两个 round（独立 + 收敛），turn 末尾产出 outcome 作为下一 turn 的种子。
 
@@ -15,14 +15,13 @@
 - 协议层不假设 participant 类型（agent / human）和 model 组合（同一个 CLI 不同 model 是不同 participant）
 - Local-only
 
-## 非目标（MVP 阶段）
-- Web UI（设计为它留接口，实现延后）
-- Human participant 的 CLI / 通知 / 提交流（协议层支持，实现等 web UI）
+## 非目标（当前阶段）
 - SQLite 元数据（filesystem 扫目录够用）
 - Role 卡 / 角色化 prompt（协议槽位留好；详见 `TODO.md`）
-- 自动循环（人按 `next` 推进）
-- LLM 起草 outcome（MVP 写 stub 让人填；详见 `TODO.md`）
+- 自动循环（人在 Web UI 按 Advance 推进）
+- LLM 起草 outcome（当前写 stub 让人在表单里填；详见 `TODO.md`）
 - MCP server（先文件协议跑通；MCP 是后续机械重构）
+- Human participant 实现（协议层支持，Web UI 已提供基础设施）
 
 ## 核心抽象
 
@@ -33,7 +32,7 @@
 - **Name**：唯一身份（branch / 路径 / 状态文件名都用它）
 - **Worktree**：每个 participant 独立 git worktree
 - **Branch**：`participant/<session>/<name>`
-- **Wake**：orchestrator 通知"该你了"（agent 用 tmux send-keys；human 未来用 web UI）
+- **Wake**：orchestrator 通知"该你了"（agent 用 tmux send-keys；human 未来通过 web UI）
 - **Done signal**：在自己分支上 git commit，subject 含 `<phase>: <name>`
 
 MVP 阶段实现 `TUIAgent` 一种 participant；`Human` 留 stub。
@@ -63,7 +62,7 @@ env = { ANTHROPIC_OAUTH_TOKEN = "..." }
 
 Orchestrator 启动 TUI 时把 `env` 注入子进程并执行 `cli + flags`（效果类似 `KEY=val claude --model sonnet`）。Branch / 路径都用 profile 名，协议层不知道 cli / model 是啥。
 
-某些 CLI 第一次进新目录会显示交互 prompt（比如 codex 的 "Do you trust this directory?"）。Profile 可选 `post_start_keys: list[str]` + `post_start_delay: float`（默认 4.0s）：spawn cli 后等 delay 秒，再把每个 string 作为一行 send-keys 投出去。例如 codex 用 `post_start_keys = [""]`（Enter 接受 trust 默认选项）。
+某些 CLI 第一次进新目录会显示交互 prompt（比如 codex 的 "Do you trust this directory?"）。Profile 可选 `post_start_keys: string[]` + `post_start_delay: number`（默认 4.0s）：spawn cli 后等 delay 秒，再把每个 string 作为一行 send-keys 投出去。例如 codex 用 `post_start_keys = [""]`（Enter 接受 trust 默认选项）。
 
 ### Turn 形状
 
@@ -92,7 +91,7 @@ turn N:
 
 Send-keys 只是 wake signal，内容在文件——避免 tmux 转义 / 引号 / 长度问题，且任意 participant 类型都用同一接口。
 
-`tmux_ops.send_keys` 在 text + Enter 同时请求时把它们拆开发：先 send text，sleep 0.3s 让 TUI ingest 完，再 send Enter。否则慢启动的 TUI（codex booting MCP 时）会把 Enter 当成多行输入里的换行而不是 submit。
+`tmux-ops.sendKeys` 在 text + Enter 同时请求时把它们拆开发：先 `tmux send-keys -l` 发 text，sleep 300ms 让 TUI ingest 完，再发 Enter。否则慢启动的 TUI（codex booting MCP 时）会把 Enter 当成多行输入里的换行而不是 submit。
 
 ## 关键设计选择
 
@@ -115,20 +114,28 @@ let-me-see-say/
 │   ├── decisions.md          # ADR 日志
 │   ├── TODO.md               # 延期项
 │   └── drafts/               # 原始脑暴草稿
-├── brainstormd/              # orchestrator (Python)
-│   ├── __init__.py
-│   ├── __main__.py
-│   ├── cli.py                # typer-based CLI
-│   ├── orchestrator.py       # state machine + outcome / pool helpers
-│   ├── participant.py        # Participant protocol + TUIAgent + Human stub
-│   ├── git_ops.py            # worktree / commit / log poll / merge
-│   ├── tmux_ops.py           # tmux wrapper (libtmux + send-keys)
-│   └── prompts.py            # task.md 模板 + commit subject helpers
-├── tests/                    # pytest 测试套（git_ops + tmux_ops + participant + ...）
+├── src/
+│   ├── lib/                  # 核心逻辑（TypeScript）
+│   │   ├── orchestrator.ts   # state machine + outcome / pool helpers
+│   │   ├── participant.ts    # Participant interface + TUIAgent + Human stub
+│   │   ├── git-ops.ts        # worktree / commit / log poll / merge
+│   │   ├── tmux-ops.ts       # tmux CLI wrapper (send-keys / capture-pane)
+│   │   ├── prompts.ts        # task.md 模板 + commit subject helpers
+│   │   ├── session-store.ts  # 内存 session 注册表 + SSE event 推送
+│   │   ├── events.ts         # SSE event 类型定义
+│   │   └── errors.ts         # GitError, TmuxError
+│   ├── app/                  # Next.js App Router
+│   │   ├── page.tsx          # Session dashboard
+│   │   ├── session/[id]/     # Session 详情页
+│   │   └── api/              # REST + SSE API routes
+│   ├── components/           # React 组件
+│   └── hooks/                # React hooks (SSE, session fetching)
+├── __tests__/lib/            # Vitest 测试套（86 个测试）
 ├── examples/                 # 端到端跑通过的真实 session 归档
 ├── agents.toml.example       # agent profile 模板（committed）
 ├── agents.toml               # 用户实际配置（gitignored）
-├── pyproject.toml            # uv + hatchling
+├── package.json              # Bun + Next.js
+├── tsconfig.json
 ├── README.md
 ├── CLAUDE.md
 └── private-workspaces/       # gitignored；每 session/participant 一个 worktree
@@ -182,14 +189,14 @@ Session finalize 时（一次性 merge）vault main 上才能看到所有人的�
 
 ### Phase 0 · Setup（turn 1 一次性）
 
-1. 人执行 `brainstorm new "topic" --vault <path> --with claude-sonnet,codex`
-2. Orchestrator：解析 vault / workspaces 路径成绝对路径（`expanduser().resolve()`）→ 算 `session_id` → `mkdir + git init` vault session 目录 → 写 `00_topic.md`、`.brainstorm/rules.md` → main 上 commit `session init`
+1. 人在 Web UI 填写 topic、选择 vault 路径和 agent profiles，点击 Start Session
+2. Orchestrator：解析 vault / workspaces 路径成绝对路径（`path.resolve()`）→ 算 `session_id`（含随机后缀防冲突）→ `mkdir + git init` vault session 目录 → 写 `00_topic.md`、`.brainstorm/rules.md` → main 上 commit `session init`
 3. 对每个 participant：
    - `git worktree add <wt-path> -b participant/<session>/<name>`（vault session repo 的 worktree）
    - 启动 TUI：`tmux new -d -s brainstorm-<session>-<name> -c <wt>`
    - send-keys 启动 agent：`KEY=val ... cli flag1 flag2`（profile.env 通过 KEY=val 前缀注入）
    - 如果 profile.post_start_keys 非空：等 `post_start_delay` 秒后投递每个 key（用于像 codex 这种第一次启动有 trust prompt 的 CLI）
-4. orchestrator `time.sleep(boot_settle_seconds=8)` 让所有 TUI 完成启动 + UI 渲染
+4. orchestrator `await sleep(bootSettleSeconds * 1000)`（默认 8s）让所有 TUI 完成启动 + UI 渲染
 
 ### Phase 1 · Boot handshake（turn 1 一次性）
 
@@ -209,8 +216,8 @@ Session finalize 时（一次性 merge）vault main 上才能看到所有人的�
 
 ### Phase 3 · Round 2（orchestrator 跨 worktree 投递匿名池）
 
-13. orchestrator 从每 participant 分支读 round-1 答卷（**不 merge**）：`git -C <vault-session> show participant/<session>/<X>:turn-1/<X>/answer.md`
-14. orchestrator 把答卷 shuffle + 按 Reply A / Reply B / ... 加标签，生成 anonymized round-1 池（纯 Python，不调 LLM）；frontmatter 里记 anonymization map（reply A → claude-sonnet 等，仅 orchestrator 用）
+13. orchestrator 从每 participant 分支读 round-1 答卷（**不 merge**）：`git show participant/<session>/<X>:turn-1/<X>/answer.md`
+14. orchestrator 把答卷 shuffle + 按 Reply A / Reply B / ... 加标签，生成 anonymized round-1 池（纯 TypeScript，不调 LLM）；frontmatter 里记 anonymization map（reply A → claude-sonnet 等，仅 orchestrator 用）
 15. 把池**复制到每个 participant worktree** 的 `.brainstorm/round-1-pool.md` + commit 到对应分支：`pool delivered: <name>`
 16. 对每个 participant：写 task.md（round-2 任务："读 .brainstorm/round-1-pool.md，refine 你的观点，写到 turn-1/<name>/refinement.md，commit"）+ commit + send-keys
 17. Participant：读 → 写 → commit `turn-1-r2: <name>`
@@ -224,17 +231,17 @@ Session finalize 时（一次性 merge）vault main 上才能看到所有人的�
     - 下半部分用 `<!-- BEGIN REVIEW MATERIALS -->` ... `<!-- END REVIEW MATERIALS -->` 包裹的参与者答卷
     - MVP 是模板组装；LLM 起草 outcome 是延期项（见 `TODO.md`）
 21. 写到 vault main worktree + commit 到 main（subject `draft outcome: turn-N`）
-22. CLI 提示人：outcome.md 路径 + "编辑后跑 `brainstorm next <session>`"
-23. 人在 Obsidian 等编辑 outcome.md：填 kind 字段、Decision / Direction 区段。**不需要手动 commit**——`brainstorm next` 入口会 auto-commit dirty main
+22. Web UI 显示 outcome 表单编辑器（kind 选择器 + Decision/Direction + Notes 文本框），同时展示 participant 提交内容供参考
+23. 人在 Web UI 编辑 outcome：选 kind、填 Decision / Direction / Notes。**不需要手动 commit**——Advance 操作会 auto-commit dirty main
 
-### Phase 5 · 衔接下一 turn（`brainstorm next`）
+### Phase 5 · 衔接下一 turn（Web UI 点击 Advance）
 
 24. orchestrator auto-commit main 上未提交的人编辑（subject `outcome confirmed: turn-N`）
 25. 读 vault main 的 `turn-N/outcome.md`，调 `_strip_review_materials` 剥掉 review block
 26. 把 stripped 版本复制到每个 participant worktree 的 `turn-N/outcome.md` + commit 到对应分支：`outcome delivered: <name>`
 27. 进入 turn N+1：写新一轮 task.md（"基于 turn-N/outcome.md 深入..."），跳到 Phase 2 → ... → Phase 4
 
-### Phase 6 · Finalize（`brainstorm finalize`）
+### Phase 6 · Finalize（Web UI 点击 Finalize）
 
 整 session 唯一的跨分支 merge，但**不是**直接 octopus——前面要做几步对齐准备，否则会 conflict：
 
@@ -249,15 +256,19 @@ Session finalize 时（一次性 merge）vault main 上才能看到所有人的�
 
 Finalize 后 vault main 上能看到所有 participant 的 raw `answer.md` / `refinement.md`（来自 merge），加上人确认的 `outcome.md`（已 stripped），跨 turn 的完整 commit 历史也都在。
 
-## MVP 范围（已实施）
+## 已实施功能
 
-- 2 个 agent profile：`claude-sonnet` + `codex`
-- 1 session、≥2 turn（端到端跑通过 3 turn）
+- 多 agent profile 支持（通过 agents.toml 配置任意数量）
+- 支持自定义 API base URL + auth token（通过 env 注入代理模型）
+- Web UI：session dashboard、实时 pane 查看（SSE）、结构化 outcome 编辑器、review materials 对比视图
+- Session resume：中断后可恢复（检测已提交的 commit 跳过已完成阶段）
+- 无限等待模式：agent 运行中不超时，只能手动 cancel
 - 文件协议（无 MCP）
-- `--vault` flag（无 `brainstorm init` 全局配置）
 - Filesystem-only（无 SQLite）
 - 只实现 TUIAgent（无 Human，留 stub）
 - 无 role 注入（协议槽位留好）
+
+技术栈：TypeScript + Bun + Next.js (App Router) + Tailwind CSS + Vitest（86 个测试）
 
 验证过的三件事：
 1. tmux send-keys + task.md 读取链路稳
@@ -269,8 +280,7 @@ Finalize 后 vault main 上能看到所有 participant 的 raw `answer.md` / `re
 ## 待解工程问题（不影响协议设计）
 
 - **Branch 命名 escape 特殊字符**：当前没处理，主题里有奇怪字符可能产生奇怪 branch 名
-- **TUI ready 检测**：MVP 用固定 `boot_settle_seconds=8` + `post_start_delay=4`；后续可以 capture-pane 主动 sniff "ready" 状态
-- **Outcome LLM 起草**：MVP 是模板 stub，让人从零写。延期项见 `TODO.md`
-- **Agent 卡住的恢复**：MVP 靠人 `tmux attach <name>` 看 + `brainstorm cancel <session>` 兜底；超时 / 重启自动化未做
-- **Tmux session 命名前缀**：已实施 `brainstorm-<session>-<name>`
+- **TUI ready 检测**：当前用固定 `bootSettleSeconds=8` + `postStartDelay=4`；后续可以 capture-pane 主动 sniff "ready" 状态
+- **Outcome LLM 起草**：当前是模板 stub，让人在表单里填。延期项见 `TODO.md`
+- **Agent 卡住的恢复**：Web UI 提供实时 pane 查看 + Cancel 按钮 + Resume 恢复；自动检测 + 重启未做
 - **Session purge / cleanup 命令**：失败的 session 现在要手动 rm vault dir + worktree + 杀 tmux；见 `TODO.md`

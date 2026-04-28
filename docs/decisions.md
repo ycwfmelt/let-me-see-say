@@ -230,3 +230,37 @@ env = { ANTHROPIC_OAUTH_TOKEN = "..." }
 - `rules.md` 增加 artifact 段落说明协议约束
 
 ---
+
+## ADR-008 · Python → TypeScript 全栈重写，CLI 替换为 Web UI（2026-04-27）
+
+**状态：** Accepted（supersedes Python CLI 实现，不改变协议层设计）
+
+**决策：**
+1. 整个代码库从 Python（typer CLI + libtmux + pytest）重写为 TypeScript（Bun + Next.js App Router + Vitest）
+2. 删除 CLI 入口，所有用户交互通过 Web UI（`bun dev` → 浏览器）
+3. tmux 操作从 libtmux Python 库改为直接 `tmux` CLI subprocess 调用
+4. Orchestrator 的阻塞轮询（`time.sleep` polling）改为 async（`await sleep` + `AbortSignal` 支持取消）
+5. 长时操作（`createSession` 等）改为 fire-and-forget async，API 立即返回 session ID，前端通过 SSE 接收实时进度
+6. Session ID 加随机后缀（4 字符）避免同日同 topic 冲突
+7. 新增 `resumeSession`：检测已有 commit 跳过已完成阶段，从中断处继续
+8. Round/boot 等待默认 timeout 改为 null（无限等待），只能通过 Cancel（AbortSignal）停止
+
+**上下文：** Issue #1（P0）要求 Web UI。Python CLI 要求 `tmux attach` 监控 agent + Obsidian 编辑 outcome，操作分散。Web UI 统一了监控（实时 pane SSE）、编辑（结构化 outcome 表单）、控制（Advance/Finalize/Cancel/Resume）。Python 代码量不大（~1,765 LOC），重写比维护两套生态成本更低。
+
+**理由：**
+- 单一 TypeScript 技术栈：前后端共享类型定义，无 Python/Node 双生态维护
+- Next.js App Router 原生支持 SSE（ReadableStream）、API routes、React Server Components
+- Bun 作为 runtime + 包管理器，启动快、`spawnSync` 与 Node 兼容
+- 所有协议层设计（git worktree 隔离、commit subject 信号、task.md 投递、outcome strip-on-delivery）零修改
+
+**考虑过的替代方案：**
+- Python FastAPI 后端 + React 前端 → 双语言生态，类型不共享
+- Python 保留 + HTMX/Jinja 模板 → 实时 pane 流和 rich UI 支撑不足
+- Svelte 替代 React → 生态更小，团队熟悉度低
+
+**结论 / 后续：**
+- 86 个测试从 pytest 移植到 Vitest，全部通过
+- Web UI 已实现：dashboard、实时 pane 查看、结构化 outcome 编辑器、review materials 对比视图、session resume
+- Python 文件（brainstormd/、tests/、pyproject.toml、uv.lock、.python-version）已删除
+
+---
