@@ -106,18 +106,32 @@ function serializeOutcome(
   return parts.join("\n");
 }
 
+type SaveStatus = "saved" | "unsaved" | "saving";
+
+function SaveStatusBadge({ status }: { status: SaveStatus }) {
+  if (status === "saving") {
+    return <span className="text-xs text-ctp-subtext0 animate-pulse">Saving...</span>;
+  }
+  if (status === "unsaved") {
+    return <span className="text-xs text-ctp-yellow">Unsaved</span>;
+  }
+  return <span className="text-xs text-ctp-green">Saved</span>;
+}
+
 export function OutcomeEditor({ sessionId, onAdvance }: Props) {
   const [turn, setTurn] = useState(0);
   const [kind, setKind] = useState<OutcomeKind | "">("");
   const [decision, setDecision] = useState("");
   const [notes, setNotes] = useState("");
   const [reviewBlock, setReviewBlock] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [loaded, setLoaded] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
   const [rawContent, setRawContent] = useState("");
   const [nextOutputMode, setNextOutputMode] = useState<OutputMode>("md-only");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dirtyRef = useRef(false);
+  const latestFieldsRef = useRef({ kind: "" as OutcomeKind | "", decision: "", notes: "" });
   const [expandedView, setExpandedView] = useState<{
     idx: number;
     round: "r1" | "r2";
@@ -135,11 +149,26 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
           setDecision(parsed.decision);
           setNotes(parsed.notes);
           setReviewBlock(parsed.reviewBlock);
+          latestFieldsRef.current = { kind: parsed.kind, decision: parsed.decision, notes: parsed.notes };
           setLoaded(true);
         }
       })
       .catch(() => {});
   }, [sessionId]);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!dirtyRef.current) return;
+      const { kind: k, decision: d, notes: n } = latestFieldsRef.current;
+      const content = serializeOutcome(turn, k, d, n, reviewBlock);
+      navigator.sendBeacon(
+        `/api/sessions/${sessionId}/outcome`,
+        new Blob([JSON.stringify({ content })], { type: "application/json" }),
+      );
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [sessionId, turn, reviewBlock]);
 
   useEffect(() => {
     if (!expandedView) return;
@@ -164,15 +193,17 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
 
   const save = useCallback(
     async (content: string) => {
-      setSaving(true);
+      setSaveStatus("saving");
       try {
         await fetch(`/api/sessions/${sessionId}/outcome`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content }),
         });
-      } finally {
-        setSaving(false);
+        dirtyRef.current = false;
+        setSaveStatus("saved");
+      } catch {
+        setSaveStatus("unsaved");
       }
     },
     [sessionId],
@@ -180,6 +211,8 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
 
   const scheduleAutoSave = useCallback(
     (k: OutcomeKind | "", d: string, n: string) => {
+      dirtyRef.current = true;
+      setSaveStatus("unsaved");
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         const content = serializeOutcome(turn, k, d, n, reviewBlock);
@@ -192,20 +225,24 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
 
   const updateKind = (k: OutcomeKind) => {
     setKind(k);
+    latestFieldsRef.current = { ...latestFieldsRef.current, kind: k };
     scheduleAutoSave(k, decision, notes);
   };
 
   const updateDecision = (d: string) => {
     setDecision(d);
+    latestFieldsRef.current = { ...latestFieldsRef.current, decision: d };
     scheduleAutoSave(kind, d, notes);
   };
 
   const updateNotes = (n: string) => {
     setNotes(n);
+    latestFieldsRef.current = { ...latestFieldsRef.current, notes: n };
     scheduleAutoSave(kind, decision, n);
   };
 
   const handleAdvance = async () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     const content = serializeOutcome(turn, kind, decision, notes, reviewBlock);
     await save(content);
     onAdvance(nextOutputMode);
@@ -221,9 +258,9 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
       expandedView.round === "r1" ? sub.round1 : sub.round2;
 
     return (
-      <div className="flex gap-4" style={{ minHeight: "60vh" }}>
+      <div className="flex gap-4 items-start" style={{ minHeight: "60vh" }}>
         {/* Left: Answer content */}
-        <div className="flex-1 min-w-0 flex flex-col border border-ctp-surface1 rounded-lg overflow-hidden">
+        <div className="flex-1 min-w-0 flex flex-col border border-ctp-surface1 rounded-lg">
           <div className="flex items-center justify-between px-4 py-2.5 bg-ctp-crust border-b border-ctp-surface1 shrink-0">
             <div className="flex items-center gap-3">
               <button
@@ -297,7 +334,7 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
               </button>
             </div>
           </div>
-          <div className="flex-1 p-5 overflow-y-auto">
+          <div className="p-5">
             {expandedContent ? (
               <Markdown content={expandedContent} />
             ) : (
@@ -305,7 +342,7 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
             )}
           </div>
           {sub.hasArtifact && (
-            <div className="p-4 border-t border-ctp-surface1 shrink-0">
+            <div className="p-4 border-t border-ctp-surface1">
               <ArtifactPreview
                 sessionId={sessionId}
                 participant={sub.name}
@@ -315,15 +352,13 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
           )}
         </div>
 
-        {/* Right: Outcome sidebar */}
-        <div className="w-80 shrink-0 flex flex-col border border-ctp-surface1 rounded-lg overflow-hidden">
+        {/* Right: Outcome sidebar — sticky so it stays visible while scrolling left pane */}
+        <div className="w-[28rem] shrink-0 sticky top-4 flex flex-col border border-ctp-surface1 rounded-lg overflow-hidden max-h-[calc(100vh-2rem)]">
           <div className="flex items-center justify-between px-4 py-2.5 bg-ctp-crust border-b border-ctp-surface1 shrink-0">
             <span className="font-medium text-sm text-ctp-subtext1">
               Turn {turn} — Outcome
             </span>
-            {saving && (
-              <span className="text-xs text-ctp-subtext0">Saving...</span>
-            )}
+            <SaveStatusBadge status={saveStatus} />
           </div>
           <div className="flex-1 p-3 space-y-3 overflow-y-auto">
             {/* Kind selector */}
@@ -404,7 +439,6 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
               </div>
             </div>
 
-            {/* Advance button */}
             <button
               type="button"
               onClick={handleAdvance}
@@ -422,11 +456,11 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-lg">Turn {turn} — Outcome</h3>
         <div className="flex items-center gap-3">
-          {saving && (
-            <span className="text-xs text-ctp-subtext0">Saving...</span>
-          )}
+          <h3 className="font-semibold text-lg">Turn {turn} — Outcome</h3>
+          <SaveStatusBadge status={saveStatus} />
+        </div>
+        <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => setShowRaw(!showRaw)}
@@ -448,6 +482,8 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
           value={rawContent}
           onChange={(e) => {
             setRawContent(e.target.value);
+            dirtyRef.current = true;
+            setSaveStatus("unsaved");
             if (debounceRef.current) clearTimeout(debounceRef.current);
             debounceRef.current = setTimeout(
               () => save(e.target.value),
