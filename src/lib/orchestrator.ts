@@ -30,6 +30,8 @@ export type Phase =
   | typeof PHASE_FINALIZED
   | typeof PHASE_CANCELLED;
 
+export type OutputMode = "md-only" | "md-and-artifact";
+
 // ---------------------------------------------------------------------------
 // Session state
 // ---------------------------------------------------------------------------
@@ -43,6 +45,7 @@ export interface SessionData {
   participants: Participant[];
   currentTurn: number;
   currentPhase: Phase;
+  outputMode: OutputMode;
 }
 
 export class Session {
@@ -54,6 +57,7 @@ export class Session {
   participants: Participant[];
   currentTurn: number;
   currentPhase: Phase;
+  outputMode: OutputMode;
 
   constructor(data: SessionData) {
     this.sessionId = data.sessionId;
@@ -64,6 +68,7 @@ export class Session {
     this.participants = data.participants;
     this.currentTurn = data.currentTurn;
     this.currentPhase = data.currentPhase;
+    this.outputMode = data.outputMode;
   }
 
   get manifestPath(): string {
@@ -88,6 +93,7 @@ export class Session {
       participants: this.participants.map(serializeParticipant),
       current_turn: this.currentTurn,
       current_phase: this.currentPhase,
+      output_mode: this.outputMode,
     };
   }
 }
@@ -156,6 +162,7 @@ export function loadSession(
     participants,
     currentTurn: data.current_turn,
     currentPhase: data.current_phase,
+    outputMode: data.output_mode ?? "md-only",
   });
 }
 
@@ -191,7 +198,7 @@ export function generateSessionId(topic: string, today?: string): string {
 // ---------------------------------------------------------------------------
 
 export function generateRound1Pool(
-  answers: [string, string][],
+  answers: [string, string, boolean][],
   turn: number,
   rng?: { shuffle: <T>(arr: T[]) => T[] },
 ): string {
@@ -216,6 +223,10 @@ export function generateRound1Pool(
     parts.push(`## Reply ${labels[i]}`);
     parts.push("");
     parts.push(shuffled[i][1].trim());
+    if (shuffled[i][2]) {
+      parts.push("");
+      parts.push("_(This participant also produced an HTML artifact prototype.)_");
+    }
     parts.push("");
   }
   return parts.join("\n");
@@ -269,8 +280,16 @@ export function stripReviewMaterials(content: string): string {
   return content.replace(REVIEW_BLOCK_RE, "").trimEnd() + "\n";
 }
 
+export interface SubmissionEntry {
+  name: string;
+  answer: string;
+  refinement: string;
+  artifactR1?: string;
+  artifactR2?: string;
+}
+
 export function buildReviewMaterials(
-  submissions: [string, string, string][],
+  submissions: SubmissionEntry[],
 ): string {
   const parts = [
     REVIEW_BEGIN_MARKER,
@@ -281,19 +300,31 @@ export function buildReviewMaterials(
     "_outcome before it's delivered to next turn's participants._",
     "",
   ];
-  for (const [name, answer, refinement] of submissions) {
-    parts.push(`## ${name}`);
+  for (const sub of submissions) {
+    parts.push(`## ${sub.name}`);
     parts.push("");
     parts.push("### Round 1 — independent answer");
     parts.push("");
-    parts.push(answer.trimEnd() || "_(no answer recorded)_");
+    parts.push(sub.answer.trimEnd() || "_(no answer recorded)_");
     parts.push("");
+    if (sub.artifactR1) {
+      parts.push(`### Round 1 — artifact`);
+      parts.push("");
+      parts.push(`<!-- artifact:r1:${sub.name} -->`);
+      parts.push("");
+    }
     parts.push(
       "### Round 2 — refinement after seeing the anonymized pool",
     );
     parts.push("");
-    parts.push(refinement.trimEnd() || "_(no refinement recorded)_");
+    parts.push(sub.refinement.trimEnd() || "_(no refinement recorded)_");
     parts.push("");
+    if (sub.artifactR2) {
+      parts.push(`### Round 2 — artifact`);
+      parts.push("");
+      parts.push(`<!-- artifact:r2:${sub.name} -->`);
+      parts.push("");
+    }
     parts.push("---");
     parts.push("");
   }
@@ -368,8 +399,9 @@ async function runRound1(
     session.currentTurn > 1
       ? `turn-${session.currentTurn - 1}/outcome.md`
       : undefined;
+  const wantArtifact = session.outputMode === "md-and-artifact";
   for (const p of session.participants) {
-    const text = prompts.round1Task(p.name, session.currentTurn, priorPath);
+    const text = prompts.round1Task(p.name, session.currentTurn, priorPath, wantArtifact);
     writeTask(p, text, `turn-${session.currentTurn}-r1`);
     p.wakeFor(`round-1-turn-${session.currentTurn}`);
   }
@@ -393,16 +425,22 @@ function deliverRound1Pool(
   session: Session,
   rng?: { shuffle: <T>(arr: T[]) => T[] },
 ): void {
-  const answers: [string, string][] = [];
+  const answers: [string, string, boolean][] = [];
   for (const p of session.participants) {
     const filePath = `turn-${session.currentTurn}/${p.name}/answer.md`;
+    const artPath = `turn-${session.currentTurn}/${p.name}/artifact.html`;
     let content: string;
     try {
       content = gitOps.showFile(session.repoPath, p.branch, filePath);
     } catch {
       content = "(no answer found)";
     }
-    answers.push([p.name, content]);
+    let hasArtifact = false;
+    try {
+      gitOps.showFile(session.repoPath, p.branch, artPath);
+      hasArtifact = true;
+    } catch { /* no artifact */ }
+    answers.push([p.name, content, hasArtifact]);
   }
   const pool = generateRound1Pool(answers, session.currentTurn, rng);
   for (const p of session.participants) {
@@ -423,8 +461,9 @@ async function runRound2(
   timeout: number | null = null,
   signal?: AbortSignal,
 ): Promise<void> {
+  const wantArtifact = session.outputMode === "md-and-artifact";
   for (const p of session.participants) {
-    const text = prompts.round2Task(p.name, session.currentTurn);
+    const text = prompts.round2Task(p.name, session.currentTurn, wantArtifact);
     writeTask(p, text, `turn-${session.currentTurn}-r2`);
     p.wakeFor(`round-2-turn-${session.currentTurn}`);
   }
@@ -445,17 +484,17 @@ async function runRound2(
 }
 
 function draftOutcome(session: Session): void {
-  const outcomePath = path.join(
-    session.repoPath,
-    `turn-${session.currentTurn}`,
-    "outcome.md",
-  );
+  const turnDir = `turn-${session.currentTurn}`;
+  const outcomePath = path.join(session.repoPath, turnDir, "outcome.md");
   fs.mkdirSync(path.dirname(outcomePath), { recursive: true });
 
-  const submissions: [string, string, string][] = [];
+  const submissions: SubmissionEntry[] = [];
+  const artifactFiles: string[] = [];
   for (const p of session.participants) {
-    const ansPath = `turn-${session.currentTurn}/${p.name}/answer.md`;
-    const refPath = `turn-${session.currentTurn}/${p.name}/refinement.md`;
+    const ansPath = `${turnDir}/${p.name}/answer.md`;
+    const refPath = `${turnDir}/${p.name}/refinement.md`;
+    const artR1Path = `${turnDir}/${p.name}/artifact.html`;
+    const artR2Path = `${turnDir}/${p.name}/artifact-r2.html`;
     let answer: string;
     try {
       answer = gitOps.showFile(session.repoPath, p.branch, ansPath);
@@ -468,7 +507,29 @@ function draftOutcome(session: Session): void {
     } catch {
       refinement = "";
     }
-    submissions.push([p.name, answer, refinement]);
+    let artifactR1: string | undefined;
+    try {
+      artifactR1 = gitOps.showFile(session.repoPath, p.branch, artR1Path);
+    } catch { /* no artifact */ }
+    let artifactR2: string | undefined;
+    try {
+      artifactR2 = gitOps.showFile(session.repoPath, p.branch, artR2Path);
+    } catch { /* no artifact */ }
+
+    if (artifactR1) {
+      const dstR1 = path.join(session.repoPath, turnDir, p.name, "artifact.html");
+      fs.mkdirSync(path.dirname(dstR1), { recursive: true });
+      fs.writeFileSync(dstR1, artifactR1);
+      artifactFiles.push(`${turnDir}/${p.name}/artifact.html`);
+    }
+    if (artifactR2) {
+      const dstR2 = path.join(session.repoPath, turnDir, p.name, "artifact-r2.html");
+      fs.mkdirSync(path.dirname(dstR2), { recursive: true });
+      fs.writeFileSync(dstR2, artifactR2);
+      artifactFiles.push(`${turnDir}/${p.name}/artifact-r2.html`);
+    }
+
+    submissions.push({ name: p.name, answer, refinement, artifactR1, artifactR2 });
   }
 
   const content =
@@ -477,9 +538,8 @@ function draftOutcome(session: Session): void {
     buildReviewMaterials(submissions) +
     "\n";
   fs.writeFileSync(outcomePath, content);
-  gitOps.commit(session.repoPath, `draft outcome: turn-${session.currentTurn}`, [
-    `turn-${session.currentTurn}/outcome.md`,
-  ]);
+  const commitFiles = [`${turnDir}/outcome.md`, ...artifactFiles];
+  gitOps.commit(session.repoPath, `draft outcome: turn-${session.currentTurn}`, commitFiles);
 }
 
 function dropTaskMdFromParticipants(session: Session): void {
@@ -563,6 +623,7 @@ export interface CreateSessionOptions {
   gitUserName?: string;
   gitUserEmail?: string;
   bootSettleSeconds?: number;
+  outputMode?: OutputMode;
 }
 
 export async function createSession(
@@ -628,6 +689,7 @@ export async function createSession(
     participants,
     currentTurn: 1,
     currentPhase: PHASE_INIT,
+    outputMode: opts.outputMode ?? "md-only",
   });
   session.saveManifest();
 
@@ -660,12 +722,17 @@ export async function createSession(
 export async function advanceToNextTurn(
   session: Session,
   signal?: AbortSignal,
+  outputMode?: OutputMode,
 ): Promise<Session> {
   if (session.currentPhase !== PHASE_OUTCOME_PENDING) {
     throw new Error(
       `Cannot advance: session is in phase ${JSON.stringify(session.currentPhase)}, ` +
         `expected ${JSON.stringify(PHASE_OUTCOME_PENDING)}`,
     );
+  }
+
+  if (outputMode) {
+    session.outputMode = outputMode;
   }
 
   commitPendingMainChanges(

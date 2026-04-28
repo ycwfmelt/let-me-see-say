@@ -110,10 +110,10 @@ describe("generateRound1Pool", () => {
   };
 
   it("anonymizes and labels", () => {
-    const answers: [string, string][] = [
-      ["alice", "alice's view\n"],
-      ["bob", "bob's view\n"],
-      ["claude", "claude's view\n"],
+    const answers: [string, string, boolean][] = [
+      ["alice", "alice's view\n", false],
+      ["bob", "bob's view\n", false],
+      ["claude", "claude's view\n", false],
     ];
     const pool = generateRound1Pool(answers, 1, deterministicRng);
     expect(pool).toContain("anonymization:");
@@ -127,10 +127,10 @@ describe("generateRound1Pool", () => {
   });
 
   it("deterministic with same rng", () => {
-    const answers: [string, string][] = [
-      ["a", "x"],
-      ["b", "y"],
-      ["c", "z"],
+    const answers: [string, string, boolean][] = [
+      ["a", "x", false],
+      ["b", "y", false],
+      ["c", "z", false],
     ];
     const rng1 = {
       shuffle<T>(arr: T[]): T[] {
@@ -150,9 +150,9 @@ describe("generateRound1Pool", () => {
   });
 
   it("includes all content", () => {
-    const answers: [string, string][] = [
-      ["alice", "ALPHA-CONTENT"],
-      ["bob", "BETA-CONTENT"],
+    const answers: [string, string, boolean][] = [
+      ["alice", "ALPHA-CONTENT", false],
+      ["bob", "BETA-CONTENT", false],
     ];
     const pool = generateRound1Pool(answers, 2, deterministicRng);
     expect(pool).toContain("ALPHA-CONTENT");
@@ -181,9 +181,9 @@ describe("outcomeStub", () => {
 
 describe("review materials", () => {
   it("build includes each participant block", () => {
-    const submissions: [string, string, string][] = [
-      ["alice", "ALICE-ROUND-1", "ALICE-ROUND-2"],
-      ["bob", "BOB-ROUND-1", "BOB-ROUND-2"],
+    const submissions = [
+      { name: "alice", answer: "ALICE-ROUND-1", refinement: "ALICE-ROUND-2" },
+      { name: "bob", answer: "BOB-ROUND-1", refinement: "BOB-ROUND-2" },
     ];
     const text = buildReviewMaterials(submissions);
     expect(text).toContain(REVIEW_BEGIN_MARKER);
@@ -197,7 +197,7 @@ describe("review materials", () => {
   });
 
   it("build handles missing content", () => {
-    const submissions: [string, string, string][] = [["alice", "", ""]];
+    const submissions = [{ name: "alice", answer: "", refinement: "" }];
     const text = buildReviewMaterials(submissions);
     expect(text).toContain("## alice");
     expect(text).toContain("no answer recorded");
@@ -270,6 +270,7 @@ describe("draftOutcome", () => {
       participants: [agent],
       currentTurn: 1,
       currentPhase: PHASE_OUTCOME_PENDING,
+      outputMode: "md-only",
     });
 
     _draftOutcome(session);
@@ -332,6 +333,7 @@ describe("deliverOutcomeToParticipants", () => {
       participants: [agent],
       currentTurn: 1,
       currentPhase: PHASE_OUTCOME_PENDING,
+      outputMode: "md-only",
     });
 
     _deliverOutcomeToParticipants(session);
@@ -382,6 +384,7 @@ function makeTestSession(): Session {
     participants: [agent],
     currentTurn: 2,
     currentPhase: PHASE_OUTCOME_PENDING,
+    outputMode: "md-only",
   });
 }
 
@@ -424,6 +427,7 @@ describe("manifest roundtrip", () => {
       ],
       currentTurn: 1,
       currentPhase: "init",
+      outputMode: "md-only",
     });
     session.saveManifest();
     const loaded = loadSession("human-session", path.join(tmpDir, "wk"));
@@ -492,6 +496,7 @@ function makeFinalizeReadySession(): { session: Session; repo: string } {
     participants: [a, b],
     currentTurn: 1,
     currentPhase: PHASE_OUTCOME_PENDING,
+    outputMode: "md-only",
   });
   return { session, repo };
 }
@@ -579,6 +584,7 @@ describe("finalize", () => {
       participants: [a, b],
       currentTurn: 1,
       currentPhase: PHASE_OUTCOME_PENDING,
+      outputMode: "md-only",
     });
 
     finalize(session);
@@ -656,6 +662,7 @@ describe("finalize", () => {
       participants: [a, b],
       currentTurn: 1,
       currentPhase: PHASE_OUTCOME_PENDING,
+      outputMode: "md-only",
     });
 
     finalize(session);
@@ -718,6 +725,7 @@ describe("advance commits dirty outcome", () => {
       participants: [a],
       currentTurn: 1,
       currentPhase: PHASE_OUTCOME_PENDING,
+      outputMode: "md-only",
     });
     session.saveManifest();
 

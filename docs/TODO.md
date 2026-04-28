@@ -35,9 +35,11 @@
   - OpenRouter / Ollama / 其他
   - Agent profile schema 已支持任意 `cli` + `flags` + `env`，所以是写 wrapper / 加 example profile 的工作，不是协议变更
 
-- [ ] **Artifact 多形态**
-  - 协议层目录结构 `turn-N/<participant>/` 已支持任意文件类型
-  - MVP 只处理 markdown；UX 设计类主题用 HTML mockup、图表、草图等等都还不行
+- [x] **Artifact 多形态（HTML 原型）** — ADR-007, issue #9
+  - session 级 `outputMode`（`md-only` | `md-and-artifact`）控制是否产出 artifact
+  - 单文件 HTML+CSS+JS 原型，路径 `turn-N/<name>/artifact.html` / `artifact-r2.html`
+  - Web UI 用 sandboxed iframe 预览，支持查看源码
+  - 后续可扩展支持更多 artifact 类型（图表、Mermaid 等）
 
 - [ ] **Codex trust 通过 config.toml 预登记（替代 post_start_keys）**
   - 当前 MVP：`agents.toml` 里 `post_start_keys = [""]`，每个 session spawn 时自动按 Enter 接受 trust prompt

@@ -78,9 +78,13 @@ export default function SessionPage({
     refresh();
   }, [id, refresh]);
 
-  const handleAdvance = useCallback(async () => {
+  const handleAdvance = useCallback(async (outputMode?: string) => {
     setOrchestratorRunning(true);
-    await fetch(`/api/sessions/${id}/advance`, { method: "POST" });
+    await fetch(`/api/sessions/${id}/advance`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ outputMode }),
+    });
     refresh();
   }, [id, refresh]);
 
@@ -203,7 +207,11 @@ export default function SessionPage({
       {/* Outcome editor (when outcome-pending) */}
       {isOutcomePending && (
         <div className="p-4 rounded-lg border border-gray-800 bg-gray-900/50">
-          <OutcomeEditor sessionId={id} onAdvance={handleAdvance} />
+          <OutcomeEditor
+            sessionId={id}
+            outputMode={session.outputMode ?? "md-only"}
+            onAdvance={handleAdvance}
+          />
         </div>
       )}
 

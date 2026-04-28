@@ -22,7 +22,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { topic, vaultPath, participants } = body;
+  const { topic, vaultPath, participants, outputMode } = body;
 
   if (!topic || !vaultPath || !participants?.length) {
     return NextResponse.json(
@@ -36,6 +36,7 @@ export async function POST(request: Request) {
       topic,
       vaultPath,
       participants,
+      outputMode,
     });
     return NextResponse.json({ sessionId }, { status: 202 });
   } catch (err) {

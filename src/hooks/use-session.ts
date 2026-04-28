@@ -16,6 +16,7 @@ export interface SessionDetail {
   repoPath: string;
   currentTurn: number;
   currentPhase: string;
+  outputMode: "md-only" | "md-and-artifact";
   participants: ParticipantInfo[];
 }
 

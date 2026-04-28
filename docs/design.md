@@ -102,6 +102,7 @@ Send-keys 只是 wake signal，内容在文件——避免 tmux 转义 / 引号 
 - **Turn = 深入；outcome 替 recap**（ADR-004）：turn 间传递的是"下一步要做什么"
 - **Participant 抽象 + task.md 唤醒协议**（ADR-005）：agent + human 协议层等价
 - **Outcome.md 嵌入答卷供人 review，投递时 strip**（ADR-006）：同一份 outcome.md 在 vault 里给人看时带答卷，给下一 turn agent 看时只剩决定
+- **Artifact 支持**（ADR-007）：session 级 `outputMode` 控制 participant 是否产出 HTML 原型（`artifact.html`）；Web UI 用 sandboxed iframe 预览
 
 ## 仓库 / vault 布局
 
@@ -166,7 +167,9 @@ Vault session 目录（orchestrator 在 vault 里创建）：
 ├── turn-1/
 │   ├── <name>/               # 该 participant 的答题目录（其它 participant 看不到）
 │   │   ├── answer.md         # round-1 答卷
-│   │   └── refinement.md     # round-2 refinement
+│   │   ├── refinement.md     # round-2 refinement
+│   │   ├── artifact.html     # round-1 HTML 原型（outputMode=md-and-artifact 时）
+│   │   └── artifact-r2.html  # round-2 refined artifact（可选）
 │   └── outcome.md            # 上一 turn 完成、人确认后 orchestrator 投递（已 strip review block）
 └── turn-2/<name>/
 ```

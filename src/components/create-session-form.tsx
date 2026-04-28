@@ -10,12 +10,15 @@ interface AgentProfile {
   flags: string[];
 }
 
+type OutputMode = "md-only" | "md-and-artifact";
+
 export function CreateSessionForm() {
   const router = useRouter();
   const [topic, setTopic] = useState("");
   const [vaultPath, setVaultPath] = useState("");
   const [profiles, setProfiles] = useState<Record<string, AgentProfile>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [outputMode, setOutputMode] = useState<OutputMode>("md-only");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,6 +54,7 @@ export function CreateSessionForm() {
           topic,
           vaultPath,
           participants: [...selected],
+          outputMode,
         }),
       });
       const data = await res.json();
@@ -112,6 +116,35 @@ export function CreateSessionForm() {
             ))}
           </div>
         )}
+      </div>
+      <div>
+        <label className="block text-sm text-gray-400 mb-2">
+          Output Format
+        </label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setOutputMode("md-only")}
+            className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+              outputMode === "md-only"
+                ? "border-blue-500 bg-blue-500/20 text-blue-300"
+                : "border-gray-700 bg-gray-900 text-gray-400 hover:border-gray-500"
+            }`}
+          >
+            Markdown only
+          </button>
+          <button
+            type="button"
+            onClick={() => setOutputMode("md-and-artifact")}
+            className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+              outputMode === "md-and-artifact"
+                ? "border-blue-500 bg-blue-500/20 text-blue-300"
+                : "border-gray-700 bg-gray-900 text-gray-400 hover:border-gray-500"
+            }`}
+          >
+            Markdown + HTML artifact
+          </button>
+        </div>
       </div>
       {error && (
         <div className="text-red-400 text-sm">{error}</div>
