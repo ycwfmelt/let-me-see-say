@@ -5,27 +5,27 @@
 ## 协议层已留槽位，等实现
 
 - [ ] **Role 卡 / 角色化 prompt**
-  - 槽位：`Participant` 数据有 `role: Optional[str]` 字段；prompt 模板有 `{{role_section}}` 注入位
-  - 触发：web UI 提供 role 选择 UI；或 CLI 用户在 agent profile 里手填
+  - 槽位：`Participant` 接口有 `role` 字段预留；prompt 模板有 `{{role_section}}` 注入位
+  - 触发：Web UI 提供 role 选择 UI；或在 agent profile 里配置
   - 价值：draft-A §12 提到的"发散 / 批判 / 落地 / 用户视角"——尤其"用户视角"那个故意唱反调的角色，纯靠模型默认倾向不会有人主动承担
   - 详见 ADR-004
 
 - [ ] **Human participant 实现**
-  - 槽位：协议层（branch / 文件结构 / task.md / status）对 human 完全适用，已经设计成 web UI 来时无需协议变更
-  - 触发：web UI 上线
+  - 槽位：协议层（branch / 文件结构 / task.md / status）对 human 完全适用，无需协议变更
+  - Web UI 已提供基础设施（SSE 实时更新、outcome 编辑器），需要增加：task.md 展示 → 人在 UI 输入答案 → 写文件 + commit 的流程
   - 形态：参考"狼人杀"——human 每轮拿到一个明确的 task.md → web UI 展示给人 → 人在 UI 里输入答案 → web UI 写文件 + commit
   - 详见 ADR-005
 
 ## 等需求触发
 
 - [ ] **LLM 起草 outcome**
-  - 当前 MVP：`_draft_outcome` 写一个空 stub（`kind: ?` + `Decision / Direction: ...`）+ 嵌入 review materials，人从零填决定区
+  - 当前：`draftOutcome` 写一个空 stub（`kind: ?` + `Decision / Direction: ...`）+ 嵌入 review materials，人在 Web UI 表单里填决定区
   - 升级：调 LLM（Anthropic API 直调最简单）读所有 round-1 + round-2 内容，自动起草决定区，人编辑修订
-  - 模板和 strip 逻辑都已就绪；只需在 `_draft_outcome` 里加 LLM 调用
+  - 模板和 strip 逻辑都已就绪；只需在 `draftOutcome` 里加 LLM 调用
 
 - [ ] **SQLite session 元数据**
-  - 当前 MVP：扫 vault 目录够用
-  - 触发：web UI 需要快速列 session、按 status filter 等
+  - 当前：扫 `private-workspaces` 目录 + 读 session.json manifest
+  - 触发：session 数量多时需要快速列表、按 status filter、搜索等
 
 - [ ] **MCP server**
   - 当前：纯文件协议
@@ -46,17 +46,17 @@
 
 ## 可观测性 / 健壮性
 
-- [ ] **Session purge / cleanup 命令**
+- [ ] **Session purge / cleanup**
   - 当前：失败的 session 要手动 `rm -rf` vault session 目录 + 本地 worktree + 杀残留 tmux
-  - 加 `brainstorm purge <session-id>`：把这三件事打包做掉
+  - 加 Web UI 上的 Purge 按钮：删 vault session 目录 + worktree + 杀 tmux session
   - 注意：操作在 finalize 之外的 session 上要警告（数据可能未归档）
 
 - [ ] **Agent 卡住的检测与恢复**
-  - MVP 靠人 `tmux attach <session-name>` 看 + `brainstorm cancel <session>` 兜底
-  - 后续：超时检测（`wait_for_subjects` 已有 timeout）、自动重启 / 降级、卡死 LLM 调用的 timeout
+  - 当前：Web UI 提供实时 pane 查看 + Cancel 按钮 + Resume 恢复
+  - 后续：自动检测卡住（pane 长时间无输出变化）、自动重启 / 降级
 
 - [ ] **TUI ready 主动 sniff**
-  - MVP：固定 `boot_settle_seconds=8` + `post_start_delay=4`
+  - 当前：固定 `bootSettleSeconds=8` + `postStartDelay=4`
   - 升级：`tmux capture-pane` 看 pane content，匹配各 CLI 的 "ready" 字样（claude 的输入框 / codex 的 "Booting MCP" 完成等）后再发 wake-key
   - 好处：消除时序假设，处理 cold start 慢的情况
 

@@ -196,3 +196,71 @@ env = { ANTHROPIC_OAUTH_TOKEN = "..." }
 - Marker 字符串以常量形式 export 到 `orchestrator.REVIEW_BEGIN_MARKER` / `REVIEW_END_MARKER`，模板 + strip 用同一对常量保证一致
 
 ---
+
+## ADR-007 · Artifact 支持：agent 可产出 HTML 原型，由 outputMode 控制（2026-04-28）
+
+**状态：** Accepted
+
+**决策：**
+1. 新增 session 级 `outputMode` 字段（`"md-only"` | `"md-and-artifact"`），控制本 turn 是否要求 participant 产出 artifact
+2. Artifact 是单文件 HTML+CSS+JS，路径 `turn-N/<name>/artifact.html`（round-1）和 `turn-N/<name>/artifact-r2.html`（round-2，可选）
+3. `outputMode` 在创建 session 时设置，可在 advance 时修改（outcome editor 提供 next-turn 切换）
+4. Round-1 pool 中注明"此 Reply 附带 HTML 原型"但不嵌入 artifact 内容——匿名池仍为纯 markdown
+5. Review materials block 用 `<!-- artifact:r1:<name> -->` / `<!-- artifact:r2:<name> -->` marker 标记有 artifact 的 participant，前端通过 API 获取 artifact 并在 sandboxed iframe 中预览
+6. Artifact 文件在 `draftOutcome` 时从 participant 分支 `git show` 拷贝到 vault main 的 `turn-N/<name>/` 目录（与 outcome.md 一起 commit），供 review 使用
+
+**上下文：** UX / 设计类脑暴主题中，纯 markdown 描述不够直观。Agent（如 Claude）完全有能力生成自包含的 HTML 文件作为低保真原型。目录结构 `turn-N/<participant>/` 本就支持任意文件类型（参见 TODO.md "Artifact 多形态"），此 ADR 激活了这个能力。
+
+**理由：**
+- 最简路径：单文件 HTML（inline CSS/JS，无外部依赖）= agent 最容易产出、用户最容易预览的 artifact 形态
+- `outputMode` 作为 session 级而非 turn 级配置，简化状态管理；advance 时可选覆盖兼顾灵活性
+- Round-1 pool 不嵌入 artifact HTML（会让匿名池过长且破坏 markdown 可读性），只标注"有 artifact"让 round-2 participant 知道这件事
+- Sandboxed iframe（`sandbox="allow-scripts"`，不含 `allow-same-origin`）预览 artifact，防止 XSS
+
+**考虑过的替代方案：**
+- 每 turn 单独设 outputMode → 状态多、UI 复杂，实际大部分 session 全程同一 mode
+- Artifact 嵌入 round-1 pool → pool 变太长，且 HTML 在 markdown 里不可读
+- 多文件 artifact（JS/CSS/图片分文件）→ 复杂度剧增，低保真原型不需要
+
+**结论 / 后续：**
+- `prompts.ts` round-1/round-2 task 模板在 `artifact=true` 时追加 artifact 指令
+- `orchestrator.ts` 的 `draftOutcome` 收集 artifact 文件并拷贝到 vault main
+- 新增 API route `GET /api/sessions/[id]/artifact?participant=&turn=&round=` 提供 artifact HTML
+- `ArtifactPreview` React 组件用 sandboxed iframe 渲染，集成到 `ReviewMaterials` 和 `OutcomeEditor`
+- `rules.md` 增加 artifact 段落说明协议约束
+
+---
+
+## ADR-008 · Python → TypeScript 全栈重写，CLI 替换为 Web UI（2026-04-27）
+
+**状态：** Accepted（supersedes Python CLI 实现，不改变协议层设计）
+
+**决策：**
+1. 整个代码库从 Python（typer CLI + libtmux + pytest）重写为 TypeScript（Bun + Next.js App Router + Vitest）
+2. 删除 CLI 入口，所有用户交互通过 Web UI（`bun dev` → 浏览器）
+3. tmux 操作从 libtmux Python 库改为直接 `tmux` CLI subprocess 调用
+4. Orchestrator 的阻塞轮询（`time.sleep` polling）改为 async（`await sleep` + `AbortSignal` 支持取消）
+5. 长时操作（`createSession` 等）改为 fire-and-forget async，API 立即返回 session ID，前端通过 SSE 接收实时进度
+6. Session ID 加随机后缀（4 字符）避免同日同 topic 冲突
+7. 新增 `resumeSession`：检测已有 commit 跳过已完成阶段，从中断处继续
+8. Round/boot 等待默认 timeout 改为 null（无限等待），只能通过 Cancel（AbortSignal）停止
+
+**上下文：** Issue #1（P0）要求 Web UI。Python CLI 要求 `tmux attach` 监控 agent + Obsidian 编辑 outcome，操作分散。Web UI 统一了监控（实时 pane SSE）、编辑（结构化 outcome 表单）、控制（Advance/Finalize/Cancel/Resume）。Python 代码量不大（~1,765 LOC），重写比维护两套生态成本更低。
+
+**理由：**
+- 单一 TypeScript 技术栈：前后端共享类型定义，无 Python/Node 双生态维护
+- Next.js App Router 原生支持 SSE（ReadableStream）、API routes、React Server Components
+- Bun 作为 runtime + 包管理器，启动快、`spawnSync` 与 Node 兼容
+- 所有协议层设计（git worktree 隔离、commit subject 信号、task.md 投递、outcome strip-on-delivery）零修改
+
+**考虑过的替代方案：**
+- Python FastAPI 后端 + React 前端 → 双语言生态，类型不共享
+- Python 保留 + HTMX/Jinja 模板 → 实时 pane 流和 rich UI 支撑不足
+- Svelte 替代 React → 生态更小，团队熟悉度低
+
+**结论 / 后续：**
+- 86 个测试从 pytest 移植到 Vitest，全部通过
+- Web UI 已实现：dashboard、实时 pane 查看、结构化 outcome 编辑器、review materials 对比视图、session resume
+- Python 文件（brainstormd/、tests/、pyproject.toml、uv.lock、.python-version）已删除
+
+---
