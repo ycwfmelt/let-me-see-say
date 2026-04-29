@@ -11,22 +11,39 @@ export function useSSE(sessionId: string | null) {
   useEffect(() => {
     if (!sessionId) return;
 
-    const es = new EventSource(`/api/sessions/${sessionId}/events`);
-    esRef.current = es;
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    es.onopen = () => setConnected(true);
-    es.onerror = () => setConnected(false);
-    es.onmessage = (e) => {
-      try {
-        const event = JSON.parse(e.data) as SessionEvent;
-        setEvents((prev) => [...prev.slice(-200), event]);
-      } catch {
-        /* ignore parse errors */
-      }
-    };
+    function connect() {
+      if (cancelled) return;
+      const es = new EventSource(`/api/sessions/${sessionId}/events`);
+      esRef.current = es;
+
+      es.onopen = () => setConnected(true);
+      es.onerror = () => {
+        setConnected(false);
+        es.close();
+        esRef.current = null;
+        if (!cancelled) {
+          retryTimer = setTimeout(connect, 3000);
+        }
+      };
+      es.onmessage = (e) => {
+        try {
+          const event = JSON.parse(e.data) as SessionEvent;
+          setEvents((prev) => [...prev.slice(-200), event]);
+        } catch {
+          /* ignore parse errors */
+        }
+      };
+    }
+
+    connect();
 
     return () => {
-      es.close();
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      esRef.current?.close();
       esRef.current = null;
       setConnected(false);
     };

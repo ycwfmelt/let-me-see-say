@@ -341,11 +341,13 @@ function writeTask(
   );
   fs.mkdirSync(path.dirname(taskPath), { recursive: true });
   fs.writeFileSync(taskPath, text);
-  gitOps.commit(
-    participant.worktreePath,
-    `task: ${phaseLabel}: ${participant.name}`,
-    [".brainstorm/task.md"],
-  );
+  if (gitOps.hasDirtyState(participant.worktreePath)) {
+    gitOps.commit(
+      participant.worktreePath,
+      `task: ${phaseLabel}: ${participant.name}`,
+      [".brainstorm/task.md"],
+    );
+  }
 }
 
 async function runBoot(
@@ -434,9 +436,11 @@ function deliverRound1Pool(
       "round-1-pool.md",
     );
     fs.writeFileSync(poolPath, pool);
-    gitOps.commit(p.worktreePath, `pool delivered: ${p.name}`, [
-      ".brainstorm/round-1-pool.md",
-    ]);
+    if (gitOps.hasDirtyState(p.worktreePath)) {
+      gitOps.commit(p.worktreePath, `pool delivered: ${p.name}`, [
+        ".brainstorm/round-1-pool.md",
+      ]);
+    }
   }
 }
 
@@ -524,11 +528,13 @@ function dropTaskMdFromParticipants(session: Session): void {
     const taskMd = path.join(p.worktreePath, ".brainstorm", "task.md");
     if (!fs.existsSync(taskMd)) continue;
     fs.unlinkSync(taskMd);
-    gitOps.commit(
-      p.worktreePath,
-      `drop task.md before finalize: ${p.name}`,
-      [".brainstorm/task.md"],
-    );
+    if (gitOps.hasDirtyState(p.worktreePath)) {
+      gitOps.commit(
+        p.worktreePath,
+        `drop task.md before finalize: ${p.name}`,
+        [".brainstorm/task.md"],
+      );
+    }
   }
 }
 
@@ -576,9 +582,11 @@ function deliverOutcomeToParticipants(session: Session): void {
     );
     fs.mkdirSync(path.dirname(outcomeDst), { recursive: true });
     fs.writeFileSync(outcomeDst, content);
-    gitOps.commit(p.worktreePath, `outcome delivered: ${p.name}`, [
-      `turn-${session.currentTurn}/outcome.md`,
-    ]);
+    if (gitOps.hasDirtyState(p.worktreePath)) {
+      gitOps.commit(p.worktreePath, `outcome delivered: ${p.name}`, [
+        `turn-${session.currentTurn}/outcome.md`,
+      ]);
+    }
   }
 }
 
@@ -869,28 +877,11 @@ export async function resumeSession(
     return session;
   }
 
-  // From init or boot-done: round-1 commits may already exist, check and skip
+  // From init or boot-done: re-run round-1 (idempotent writes + wake all participants)
   if (phase === PHASE_INIT || phase === PHASE_BOOT_DONE) {
-    const allRound1Done = session.participants.every((p) =>
-      gitOps.hasSubject(
-        session.repoPath,
-        p.branch,
-        prompts.round1Subject(p.name, session.currentTurn),
-      ),
-    );
-    if (allRound1Done) {
-      session.currentPhase = PHASE_ROUND_1_DONE;
-      session.saveManifest();
-    } else {
-      // Wait for remaining round-1 commits
-      const branchToSubject: Record<string, string> = {};
-      for (const p of session.participants) {
-        branchToSubject[p.branch] = prompts.round1Subject(p.name, session.currentTurn);
-      }
-      await gitOps.waitForSubjects(session.repoPath, branchToSubject, 2.0, null, signal);
-      session.currentPhase = PHASE_ROUND_1_DONE;
-      session.saveManifest();
-    }
+    await runRound1(session, null, signal);
+    session.currentPhase = PHASE_ROUND_1_DONE;
+    session.saveManifest();
   }
 
   // From round-1-done: deliver pool + run round-2

@@ -156,9 +156,12 @@ export function OutcomeEditor({ sessionId, onAdvance }: Props) {
       .catch(() => {});
   }, [sessionId]);
 
+  const loadedRef = useRef(false);
+  useEffect(() => { loadedRef.current = loaded; }, [loaded]);
+
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (!dirtyRef.current) return;
+      if (!loadedRef.current || !dirtyRef.current) return;
       const { kind: k, decision: d, notes: n } = latestFieldsRef.current;
       const content = serializeOutcome(turn, k, d, n, reviewBlock);
       navigator.sendBeacon(

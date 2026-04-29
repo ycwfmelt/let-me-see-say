@@ -123,12 +123,11 @@ export default function SessionPage({
   const isTerminal =
     currentPhase === "finalized" || currentPhase === "cancelled";
   const isOutcomePending = currentPhase === "outcome-pending";
-  // Show Resume only when stuck (not terminal, not outcome-pending, and orchestrator not actively running)
+  // Show Resume when stuck (not terminal, not outcome-pending, and orchestrator not actively running)
   const canResume =
     !isTerminal &&
     !isOutcomePending &&
-    !effectiveRunning &&
-    currentPhase !== "init";
+    !effectiveRunning;
 
   return (
     <main className="mx-auto px-6 py-8 space-y-6">
